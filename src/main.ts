@@ -10,10 +10,7 @@ async function bootstrap() {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   app.use(cors({
-    origin: ['http://localhost:3000',
-      'https://datapilote-front-33zx.vercel.app',
-
-              ],
+origin: '*', 
     credentials: true,
   }));
   app.setGlobalPrefix('api/v1')
