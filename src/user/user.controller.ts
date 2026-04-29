@@ -29,6 +29,31 @@ import { ROLE_CREATION_RULES } from './entities/user.entity';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  /**
+   * ✅ Déterminer si un utilisateur peut gérer un autre utilisateur
+   * basé sur ROLE_CREATION_RULES (qui peut créer peut aussi lire, modifier, supprimer)
+   */
+  private canManageUser(requester: any, targetUser: any): boolean {
+    // Super admin peut tout faire
+    if (requester.role === UserRole.SUPER_ADMIN) {
+      return true;
+    }
+
+    // L'utilisateur peut se gérer lui-même
+    if (requester.id === targetUser.id) {
+      return true;
+    }
+
+    // Vérifier que la cible est dans la même company
+    if (targetUser.company?.id !== requester.companyId) {
+      return false;
+    }
+
+    // Vérifier si le rôle de la cible est dans les rôles gérables par le requester
+    const manageableRoles = ROLE_CREATION_RULES[requester.role as keyof typeof ROLE_CREATION_RULES] || [];
+    return manageableRoles.includes(targetUser.role);
+  }
+
   // -------------------- LISTER TOUS LES UTILISATEURS --------------------
   @Get()
   @Roles(
@@ -62,22 +87,23 @@ export class UserController {
     // Tous les autres rôles : on récupère uniquement les users de la même company
     const companyId = requester.companyId;
     if (!companyId) {
-      // Si l'utilisateur n'a pas de companyId et n'est pas super admin, on refuse
       throw new BadRequestException('Requester has no companyId');
     }
 
     const allUsersInCompany = await this.userService.findByCompany(companyId);
 
-    // Rôles visibles selon ROLE_CREATION_RULES
-    const visibleRoles = ROLE_CREATION_RULES[requester.role as keyof typeof ROLE_CREATION_RULES] || [];
+    // Rôles gérables selon ROLE_CREATION_RULES
+    const manageableRoles = ROLE_CREATION_RULES[requester.role as keyof typeof ROLE_CREATION_RULES] || [];
 
-    // Si aucun rôle visible => ne voit que lui-même
-    if (visibleRoles.length === 0) {
+    // Si aucun rôle gérable => ne voit que lui-même
+    if (manageableRoles.length === 0) {
       return allUsersInCompany.filter(u => u.id === requester.id);
     }
 
-    // Filtrer par rôles visibles
-    return allUsersInCompany.filter(u => visibleRoles.includes(u.role));
+    // Filtrer par rôles gérables + lui-même
+    return allUsersInCompany.filter(u => 
+      manageableRoles.includes(u.role) || u.id === requester.id
+    );
   }
 
   // -------------------- RÉCUPÉRER UN UTILISATEUR PAR ID --------------------
@@ -107,39 +133,12 @@ export class UserController {
       throw new NotFoundException('User not found');
     }
 
-    if (requester.role === UserRole.SUPER_ADMIN) {
-      return targetUser;
-    }
-
-    // ADMIN_COMPANY : uniquement dans sa société
-    if (requester.role === UserRole.ADMIN_COMPANY) {
-      if (targetUser.company?.id === requester.companyId) {
-        return targetUser;
-      } else {
-        throw new ForbiddenException('You cannot access users from another company');
-      }
-    }
-
-    const visibleRoles = ROLE_CREATION_RULES[requester.role as keyof typeof ROLE_CREATION_RULES] || [];
-
-    // Si ne voit que lui-même
-    if (visibleRoles.length === 0) {
-      if (targetUser.id === requester.id) {
-        return targetUser;
-      }
+    // ✅ Utiliser canManageUser pour vérifier les permissions
+    if (!this.canManageUser(requester, targetUser)) {
       throw new ForbiddenException('You cannot access this user');
     }
 
-    // Si le rôle de la cible est dans les rôles visibles
-    if (visibleRoles.includes(targetUser.role)) {
-      // Vérifier company (si target a une company)
-      if (targetUser.company?.id && targetUser.company.id !== requester.companyId) {
-        throw new ForbiddenException('You cannot access users from another company');
-      }
-      return targetUser;
-    }
-
-    throw new ForbiddenException('You cannot access this user');
+    return targetUser;
   }
 
   // -------------------- CRÉER UN UTILISATEUR --------------------
@@ -176,7 +175,7 @@ export class UserController {
         throw new BadRequestException('companyId is required when creating user as SUPER_ADMIN');
       }
     } else {
-      // ignore la valeur envoyée par le front
+      // Ignorer la valeur envoyée par le front
       companyId = creator.companyId;
       if (!companyId) {
         throw new BadRequestException('Creator has no companyId');
@@ -223,23 +222,17 @@ export class UserController {
       throw new NotFoundException('User not found');
     }
 
+    // ✅ Utiliser canManageUser pour vérifier les permissions
+    if (!this.canManageUser(requester, targetUser)) {
+      throw new ForbiddenException('You cannot update this user');
+    }
+
+    // Super admin peut tout modifier
     if (requester.role === UserRole.SUPER_ADMIN) {
       return this.userService.update(id, updateUserDto);
     }
 
-    // Vérifier que la cible est dans la même company
-    if (targetUser.company?.id !== requester.companyId) {
-      throw new ForbiddenException('You cannot update users from another company');
-    }
-
-    const visibleRoles = ROLE_CREATION_RULES[requester.role as keyof typeof ROLE_CREATION_RULES] || [];
-
-    // Si le requester ne peut pas gérer le rôle de la cible et n'est pas la cible elle-même
-    if (!visibleRoles.includes(targetUser.role) && targetUser.id !== requester.id) {
-      throw new ForbiddenException('You cannot update this user');
-    }
-
-    // ADMIN_COMPANY ne peut pas changer role ni companyId
+    // ADMIN_COMPANY : ne peut pas changer role ni companyId
     if (requester.role === UserRole.ADMIN_COMPANY) {
       delete updateUserDto.role;
       delete updateUserDto.companyId;
@@ -247,8 +240,12 @@ export class UserController {
 
     // Forcer companyId côté serveur si le requester n'est pas SUPER_ADMIN
     if (requester.role !== UserRole.SUPER_ADMIN) {
-      // si updateUserDto contient companyId, on l'ignore
       delete updateUserDto.companyId;
+    }
+
+    // Ignorer memberlevel si le rôle n'est pas MEMBER
+    if (updateUserDto.role && updateUserDto.role !== UserRole.MEMBER) {
+      delete updateUserDto.memberlevel;
     }
 
     return this.userService.update(id, updateUserDto);
@@ -275,19 +272,14 @@ export class UserController {
       throw new NotFoundException('User not found');
     }
 
-    if (requester.role === UserRole.SUPER_ADMIN) {
-      return this.userService.remove(id);
-    }
-
-    // Vérifier company
-    if (targetUser.company?.id !== requester.companyId) {
-      throw new ForbiddenException('You cannot delete users from another company');
-    }
-
-    const visibleRoles = ROLE_CREATION_RULES[requester.role as keyof typeof ROLE_CREATION_RULES] || [];
-
-    if (!visibleRoles.includes(targetUser.role)) {
+    // ✅ Utiliser canManageUser pour vérifier les permissions
+    if (!this.canManageUser(requester, targetUser)) {
       throw new ForbiddenException('You cannot delete this user');
+    }
+
+    // ✅ Empêcher l'auto-suppression
+    if (requester.id === targetUser.id) {
+      throw new ForbiddenException('You cannot delete your own account');
     }
 
     return this.userService.remove(id);

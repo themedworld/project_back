@@ -34,6 +34,12 @@ export enum UserRole {
   MEMBER = 'member',
 }
 
+export enum MemberLevel {
+  JUNIOR = 'junior',
+  SENIOR = 'senior',
+  EXPERT = 'expert',
+}
+
 @Entity('users')
 export class UserEntity {
   @PrimaryGeneratedColumn()
@@ -57,6 +63,15 @@ export class UserEntity {
     default: UserRole.MEMBER,
   })
   role: UserRole;
+
+  @Column({
+    type: 'enum',
+    enum: MemberLevel,
+    nullable: true,
+  })
+  memberlevel?: MemberLevel | null;
+  @Column({ nullable: true })
+  cvlink: string;
 
   @Column({ nullable: true })
   companyId?: number | null;

@@ -13,11 +13,16 @@ import { CallsModule } from './calls/calls.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permission/permission.module';
+import { PostsModule } from './post/post.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { config } from 'dotenv';
+config();
 @Module({
   imports: [TypeOrmModule.forRoot(dataSourceOptions),
      ConfigModule.forRoot({
       isGlobal: true, // permet d'utiliser process.env partout
     }),
+    MongooseModule.forRoot(process.env.MONGO_URI as string),
     UserModule,
     AuthModule,
     ProjectsModule,
@@ -27,6 +32,7 @@ import { PermissionsModule } from './permission/permission.module';
     OpportunitiesModule,
     RolesModule,
     PermissionsModule,
+    PostsModule,
  ],
   controllers: [AppController],
   providers: [AppService],

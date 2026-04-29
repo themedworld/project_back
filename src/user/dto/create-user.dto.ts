@@ -1,5 +1,5 @@
 import { IsEmail, IsNotEmpty, IsEnum, IsOptional, MinLength } from 'class-validator';
-import { UserRole } from '../entities/user.entity';
+import { UserRole, MemberLevel } from '../entities/user.entity';
 import { Type } from 'class-transformer';
 
 export class CreateUserDto {
@@ -19,6 +19,12 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @IsOptional()
+  @IsEnum(MemberLevel)
+  memberlevel?: MemberLevel;
+  @IsOptional()
+  cvlink:string;
 
   @IsOptional()
   @Type(() => Number)
