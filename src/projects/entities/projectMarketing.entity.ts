@@ -5,10 +5,11 @@ import {
   CreateDateColumn, 
   UpdateDateColumn,
   OneToOne,
-  JoinColumn 
+  JoinColumn,
+  OneToMany
 } from 'typeorm';
 import { ProjectEntity } from './project.entity';
-
+import { SprintMarketingEntity } from './SprintMarketingEntity.entity';
 @Entity('project_marketing')
 export class ProjectMarketingEntity {
   @PrimaryGeneratedColumn()
@@ -63,6 +64,8 @@ export class ProjectMarketingEntity {
 
   @Column({ nullable: true })
   additionalNotes: string;
+   @OneToMany(() => SprintMarketingEntity, sprint => sprint.project)
+  sprints: SprintMarketingEntity[];
 
   @CreateDateColumn()
   createdAt: Date;

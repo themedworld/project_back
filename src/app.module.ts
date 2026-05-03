@@ -15,7 +15,10 @@ import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permission/permission.module';
 import { PostsModule } from './post/post.module';
 import { MongooseModule } from '@nestjs/mongoose';
+import { TaskHistoryModule } from './taskhystory/task-history.module'
+import { MemberProfileModule } from './member-profile/member-profile.module'; 
 import { config } from 'dotenv';
+
 config();
 @Module({
   imports: [TypeOrmModule.forRoot(dataSourceOptions),
@@ -33,6 +36,8 @@ config();
     RolesModule,
     PermissionsModule,
     PostsModule,
+     TaskHistoryModule,
+     MemberProfileModule
  ],
   controllers: [AppController],
   providers: [AppService],

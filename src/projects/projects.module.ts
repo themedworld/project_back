@@ -12,12 +12,18 @@ import { ProjectMarketingEntity } from './entities/projectMarketing.entity';
 import { ProjectCallCenterEntity } from './entities/projectCallCenter.entity';
 import { TaskITEntity } from './entities/TaskITEntity.entity';
 import { SprintITEntity } from './entities/SprintITEntity.entity';
+import { SprintMarketingEntity } from './entities/SprintMarketingEntity.entity';
+import { TaskMarketingEntity } from './entities/TaskMarketingEntity.entity';
+import { SprintCallCenterEntity } from './entities/SprintCallCenterEntity.entity';
+import { TaskCallCenterEntity } from './entities/TaskCallCenterEntity.entity';
+import { TaskHistoryModule } from 'src/taskhystory/task-history.module';
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ProjectEntity, UserEntity, ProjectITEntity, ProjectMarketingEntity, ProjectCallCenterEntity,TaskITEntity,SprintITEntity]),
+    TypeOrmModule.forFeature([ProjectEntity, UserEntity, ProjectITEntity, ProjectMarketingEntity, ProjectCallCenterEntity,TaskITEntity,SprintITEntity,SprintMarketingEntity,TaskMarketingEntity,SprintCallCenterEntity,TaskCallCenterEntity]),
     forwardRef(() => UserModule),
     forwardRef(() => CompaniesModule),
     forwardRef(() => AuthModule),
+    forwardRef(() => TaskHistoryModule),
   ],
   controllers: [ProjectsController],
   providers: [ProjectsService],

@@ -22,6 +22,21 @@ import { CreateTaskITDto } from './dto/create-task-it.dto';
 import { UpdateSprintITDto } from './dto/update-sprint-it.dto';
 import { UpdateTaskITDto } from './dto/update-task-it.dto';
 import { TaskStatus } from './entities/TaskITEntity.entity';
+import { TaskHistoryService } from 'src/taskhystory/task-history.service';
+import { SprintMarketingEntity } from './entities/SprintMarketingEntity.entity';
+import { TaskMarketingEntity } from './entities/TaskMarketingEntity.entity';
+import { SprintCallCenterEntity } from './entities/SprintCallCenterEntity.entity';
+import { TaskCallCenterEntity } from './entities/TaskCallCenterEntity.entity';
+import { CreateSprintMarketingDto } from './dto/create-sprint-marketing.dto';
+import { CreateTaskMarketingDto } from './dto/create-sprint-marketing.dto';
+import { CreateSprintCallCenterDto } from './dto/create-sprint-callcenter.dto';
+import { CreateTaskCallCenterDto } from './dto/create-sprint-callcenter.dto';
+import { UpdateSprintMarketingDto } from './dto/update-sprint-marketing.dto';
+import { UpdateTaskMarketingDto } from './dto/update-task-marketing.dto';
+import { UpdateSprintCallCenterDto } from './dto/update-sprint-callcenter.dto';
+import { UpdateTaskCallCenterDto } from './dto/update-task-callcenter.dto';
+import { TaskMarketingStatus } from './entities/TaskMarketingEntity.entity';
+import { TaskCallCenterStatus } from './entities/TaskCallCenterEntity.entity';
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -45,6 +60,20 @@ export class ProjectsService {
 
     @InjectRepository(TaskITEntity)
     private taskITRepo: Repository<TaskITEntity>,
+     @InjectRepository(SprintMarketingEntity)
+    private sprintMarketingRepo: Repository<SprintMarketingEntity>,
+
+    @InjectRepository(TaskMarketingEntity)
+    private taskMarketingRepo: Repository<TaskMarketingEntity>,
+
+    @InjectRepository(SprintCallCenterEntity)
+    private sprintCallCenterRepo: Repository<SprintCallCenterEntity>,
+
+    @InjectRepository(TaskCallCenterEntity)
+    private taskCallCenterRepo: Repository<TaskCallCenterEntity>,
+
+
+    private taskHistoryService: TaskHistoryService,
   ) {}
 
 
@@ -616,6 +645,32 @@ async getTaskById(taskId: number): Promise<TaskITEntity> {
   return task;
 }
 
+
+
+async deleteTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
+  const task = await this.getTaskById(taskId);
+  await this.taskITRepo.remove(task);                // ← taskITRepo
+  return { message: `Tâche #${taskId} supprimée avec succès` };
+}
+
+ async updateTaskStatus(
+  taskId: number,
+  status: string,
+  user: UserEntity,
+): Promise<TaskITEntity> {
+  const task = await this.getTaskById(taskId);
+  task.status = status as TaskStatus;
+
+  // ✅ Enregistrer l'historique AVEC LE DOMAINE
+  await this.taskHistoryService.recordTaskStatusChange(
+    task.id,
+    status,
+    'IT', // ← Spécifier le domaine
+  );
+
+  return this.taskITRepo.save(task);
+}
+
 async updateTask(
   taskId: number,
   dto: UpdateTaskITDto,
@@ -623,6 +678,8 @@ async updateTask(
 ): Promise<TaskITEntity> {
   const task = await this.getTaskById(taskId);
   const { assignedTo, ...rest } = dto as any;
+  const previousStatus = task.status;
+
   Object.assign(task, rest);
 
   if (assignedTo?.id) {
@@ -631,7 +688,15 @@ async updateTask(
     task.assignedTo = member;
   }
 
-  // ✅ AJOUTER JUSTE CE BLOC
+  // ✅ Enregistrer l'historique si le statut change
+  if (dto.status && dto.status !== previousStatus) {
+    await this.taskHistoryService.recordTaskStatusChange(
+      task.id,
+      dto.status as string,
+      'IT',
+    );
+  }
+
   if (dto.status === 'DONE' && !task.actualEndDate) {
     task.actualEndDate = new Date();
     if (task.scheduledEndDate) {
@@ -642,19 +707,6 @@ async updateTask(
 
   return this.taskITRepo.save(task);
 }
-
-async deleteTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
-  const task = await this.getTaskById(taskId);
-  await this.taskITRepo.remove(task);                // ← taskITRepo
-  return { message: `Tâche #${taskId} supprimée avec succès` };
-}
-
-async updateTaskStatus(taskId: number, status: string, user: UserEntity): Promise<TaskITEntity> {
-  const task = await this.getTaskById(taskId);
-  task.status = status as any;
-  return this.taskITRepo.save(task);                 // ← taskITRepo
-}
-// Ajouter ces 2 méthodes à ProjectsService
 
 async getDeveloperDelayStats(developerId: number) {
   // Récupérer toutes les tâches complétées du développeur
@@ -695,4 +747,396 @@ async getTaskDelayInfo(taskId: number) {
         : `✅ Avance de ${Math.abs(task.delayHours || 0)}h`,
   };
 }
+  // ════════════════════════════════════════════════════════════════════
+  // 📊 MARKETING SPRINTS & TASKS
+  // ════════════════════════════════════════════════════════════════════
+
+  async createMarketingSprints(
+    projectId: number,
+    sprintsDto: CreateSprintMarketingDto[],
+  ): Promise<SprintMarketingEntity[]> {
+    const project = await this.projectMarketingRepo.findOne({
+      where: { id: projectId },
+    });
+    if (!project) throw new NotFoundException('Marketing Project not found');
+
+    const createdSprints: SprintMarketingEntity[] = [];
+
+    for (const sprintDto of sprintsDto) {
+      const sprint = this.sprintMarketingRepo.create({
+        name: sprintDto.name,
+        startDate: new Date(sprintDto.startDate),
+        endDate: new Date(sprintDto.endDate),
+        status: 'planned',
+        totalBudget: sprintDto.totalBudget,
+        campaignType: sprintDto.campaignType,
+        targetAudience: sprintDto.targetAudience,
+        expectedReach: sprintDto.expectedReach,
+        expectedLeads: sprintDto.expectedLeads,
+        expectedROI: sprintDto.expectedROI,
+        channels: sprintDto.channels,
+        goals: sprintDto.goals,
+        project,
+      });
+
+      const savedSprint = await this.sprintMarketingRepo.save(sprint);
+
+    if (sprintDto.tasks && sprintDto.tasks.length > 0) {
+  for (const taskDto of sprintDto.tasks) {
+    // ✅ Créer directement sans .create()
+    const task = new TaskMarketingEntity();
+    task.title = taskDto.title;
+    task.description = taskDto.description;
+    task.type = taskDto.type as any;
+    task.status = (taskDto.status || 'TO_DO') as any;
+    task.priority = taskDto.priority as any;
+    task.estimatedHours = taskDto.estimatedHours;
+    task.budget = taskDto.budget;
+    task.expectedViews = taskDto.expectedViews;
+    task.expectedClicks = taskDto.expectedClicks;
+    task.expectedLeads = taskDto.expectedLeads;
+    task.expectedConversions = taskDto.expectedConversions;
+    task.expectedCTR = taskDto.expectedCTR as any;
+    task.channel = taskDto.channel;
+    task.scheduledEndDate = taskDto.scheduledEndDate;
+    task.sprint = savedSprint;
+
+    if (taskDto.assignedToId) {
+      task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    }
+
+    await this.taskMarketingRepo.save(task);
+  }
+}
+
+      createdSprints.push(savedSprint);
+    }
+
+    return createdSprints;
+  }
+
+ async addTaskToMarketingSprint(
+  sprintId: number,
+  taskDto: CreateTaskMarketingDto,
+): Promise<TaskMarketingEntity> {
+  const sprint = await this.sprintMarketingRepo.findOne({
+    where: { id: sprintId },
+  });
+  if (!sprint) throw new NotFoundException('Marketing Sprint not found');
+
+  // ✅ Créer directement sans déstructuration problématique
+  const task = new TaskMarketingEntity();
+  task.title = taskDto.title;
+  task.description = taskDto.description;
+  task.type = taskDto.type as any;
+  task.status = (taskDto.status || 'TO_DO') as any;
+  task.priority = taskDto.priority as any;
+  task.estimatedHours = taskDto.estimatedHours;
+  task.budget = taskDto.budget;
+  task.expectedViews = taskDto.expectedViews;
+  task.expectedClicks = taskDto.expectedClicks;
+  task.expectedLeads = taskDto.expectedLeads;
+  task.expectedConversions = taskDto.expectedConversions;
+  task.expectedCTR = taskDto.expectedCTR as any;
+  task.channel = taskDto.channel;
+  task.scheduledEndDate = taskDto.scheduledEndDate;
+  task.sprint = sprint;
+
+  if (taskDto.assignedToId) {
+    task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+  }
+
+  return this.taskMarketingRepo.save(task);
+}
+  async getMarketingSprintById(sprintId: number): Promise<SprintMarketingEntity> {
+    const sprint = await this.sprintMarketingRepo.findOne({
+      where: { id: sprintId },
+      relations: ['tasks', 'tasks.assignedTo'],
+    });
+    if (!sprint) throw new NotFoundException(`Marketing Sprint #${sprintId} not found`);
+    return sprint;
+  }
+
+  async updateMarketingSprint(
+    sprintId: number,
+    dto: UpdateSprintMarketingDto,
+    user: UserEntity,
+  ): Promise<SprintMarketingEntity> {
+    const sprint = await this.getMarketingSprintById(sprintId);
+    Object.assign(sprint, dto);
+    return this.sprintMarketingRepo.save(sprint);
+  }
+
+  async deleteMarketingSprint(sprintId: number, user: UserEntity): Promise<{ message: string }> {
+    const sprint = await this.getMarketingSprintById(sprintId);
+    await this.sprintMarketingRepo.remove(sprint);
+    return { message: `Marketing Sprint #${sprintId} deleted successfully` };
+  }
+
+  async getMarketingTaskById(taskId: number): Promise<TaskMarketingEntity> {
+    const task = await this.taskMarketingRepo.findOne({
+      where: { id: taskId },
+      relations: ['assignedTo', 'sprint'],
+    });
+    if (!task) throw new NotFoundException(`Marketing Task #${taskId} not found`);
+    return task;
+  }
+
+ async updateMarketingTaskStatus(
+  taskId: number,
+  status: string,
+  user: UserEntity,
+): Promise<TaskMarketingEntity> {
+  const task = await this.getMarketingTaskById(taskId);
+  const previousStatus = task.status;
+
+  task.status = status as any;
+
+  // ✅ Enregistrer l'historique AVEC LE DOMAINE
+  await this.taskHistoryService.recordTaskStatusChange(
+    task.id,
+    status,
+    'Marketing', // ← Spécifier le domaine
+  );
+
+  return this.taskMarketingRepo.save(task);
+}
+
+async updateMarketingTask(
+  taskId: number,
+  dto: UpdateTaskMarketingDto,
+  user: UserEntity,
+): Promise<TaskMarketingEntity> {
+  const task = await this.getMarketingTaskById(taskId);
+  const { assignedTo, ...rest } = dto as any;
+  const previousStatus = task.status;
+
+  Object.assign(task, rest);
+
+  if (assignedTo?.id) {
+    const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+    if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
+    task.assignedTo = member;
+  }
+
+  // ✅ Enregistrer l'historique si le statut change
+  if (dto.status && dto.status !== previousStatus) {
+    await this.taskHistoryService.recordTaskStatusChange(
+      task.id,
+      dto.status as string,
+      'Marketing',
+    );
+  }
+
+  if (dto.status === 'DONE' && !task.completedAt) {
+    task.completedAt = new Date();
+    if (task.scheduledEndDate) {
+      const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
+      task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+    }
+  }
+
+  return this.taskMarketingRepo.save(task);
+}
+  async deleteMarketingTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
+    const task = await this.getMarketingTaskById(taskId);
+    await this.taskMarketingRepo.remove(task);
+    return { message: `Marketing Task #${taskId} deleted successfully` };
+  }
+
+  
+    // ════════════════════════════════════════════════════════════════════
+  // 📞 CALLCENTER SPRINTS & TASKS
+  // ════════════════════════════════════════════════════════════════════
+
+async createCallCenterSprints(
+  projectId: number,
+  sprintsDto: CreateSprintCallCenterDto[],
+): Promise<SprintCallCenterEntity[]> {
+  const project = await this.projectCallCenterRepo.findOne({
+    where: { id: projectId },
+  });
+  if (!project) throw new NotFoundException('CallCenter Project not found');
+
+  const createdSprints: SprintCallCenterEntity[] = [];
+
+  for (const sprintDto of sprintsDto) {
+    // ✅ Créer directement
+    const sprint = new SprintCallCenterEntity();
+    sprint.name = sprintDto.name;
+    sprint.startDate = new Date(sprintDto.startDate);
+    sprint.endDate = new Date(sprintDto.endDate);
+    sprint.status = 'planned';
+    sprint.targetAgents = sprintDto.targetAgents;
+    sprint.expectedCallVolume = sprintDto.expectedCallVolume;
+    sprint.targetConversionRate = sprintDto.targetConversionRate;
+    sprint.budgetAllocated = sprintDto.budgetAllocated;
+    sprint.qualityScoreTarget = sprintDto.qualityScoreTarget;
+    sprint.trainingContent = sprintDto.trainingContent;
+    sprint.scriptTemplates = sprintDto.scriptTemplates;
+    sprint.goals = sprintDto.goals;
+    sprint.project = project;
+
+    const savedSprint = await this.sprintCallCenterRepo.save(sprint);
+
+    if (sprintDto.tasks && sprintDto.tasks.length > 0) {
+      for (const taskDto of sprintDto.tasks) {
+        // ✅ Créer directement
+        const task = new TaskCallCenterEntity();
+        task.title = taskDto.title;
+        task.description = taskDto.description;
+        task.type = taskDto.type as any;
+        task.status = (taskDto.status || 'TO_DO') as any;
+        task.priority = taskDto.priority as any;
+        task.estimatedHours = taskDto.estimatedHours;
+        task.targetAgentCount = taskDto.targetAgentCount;
+        task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
+        task.targetConversionRate = taskDto.targetConversionRate;
+        task.qualityScoreTarget = taskDto.qualityScoreTarget;
+        task.scriptContent = taskDto.scriptContent;
+        task.scheduledEndDate = taskDto.scheduledEndDate;
+        task.sprint = savedSprint;
+
+        if (taskDto.assignedToId) {
+          task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+        }
+
+        await this.taskCallCenterRepo.save(task);
+      }
+    }
+
+    createdSprints.push(savedSprint);
+  }
+
+  return createdSprints;
+}
+
+ async addTaskToCallCenterSprint(
+  sprintId: number,
+  taskDto: CreateTaskCallCenterDto,
+): Promise<TaskCallCenterEntity> {
+  const sprint = await this.sprintCallCenterRepo.findOne({
+    where: { id: sprintId },
+  });
+  if (!sprint) throw new NotFoundException('CallCenter Sprint not found');
+
+  // ✅ Créer directement
+  const task = new TaskCallCenterEntity();
+  task.title = taskDto.title;
+  task.description = taskDto.description;
+  task.type = taskDto.type as any;
+  task.status = (taskDto.status || 'TO_DO') as any;
+  task.priority = taskDto.priority as any;
+  task.estimatedHours = taskDto.estimatedHours;
+  task.targetAgentCount = taskDto.targetAgentCount;
+  task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
+  task.targetConversionRate = taskDto.targetConversionRate;
+  task.qualityScoreTarget = taskDto.qualityScoreTarget;
+  task.scriptContent = taskDto.scriptContent;
+  task.scheduledEndDate = taskDto.scheduledEndDate;
+  task.sprint = sprint;
+
+  if (taskDto.assignedToId) {
+    task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+  }
+
+  return this.taskCallCenterRepo.save(task);
+}
+  async getCallCenterSprintById(sprintId: number): Promise<SprintCallCenterEntity> {
+    const sprint = await this.sprintCallCenterRepo.findOne({
+      where: { id: sprintId },
+      relations: ['tasks', 'tasks.assignedTo'],
+    });
+    if (!sprint) throw new NotFoundException(`CallCenter Sprint #${sprintId} not found`);
+    return sprint;
+  }
+
+  async updateCallCenterSprint(
+    sprintId: number,
+    dto: UpdateSprintCallCenterDto,
+    user: UserEntity,
+  ): Promise<SprintCallCenterEntity> {
+    const sprint = await this.getCallCenterSprintById(sprintId);
+    Object.assign(sprint, dto);
+    return this.sprintCallCenterRepo.save(sprint);
+  }
+
+  async deleteCallCenterSprint(sprintId: number, user: UserEntity): Promise<{ message: string }> {
+    const sprint = await this.getCallCenterSprintById(sprintId);
+    await this.sprintCallCenterRepo.remove(sprint);
+    return { message: `CallCenter Sprint #${sprintId} deleted successfully` };
+  }
+
+  async getCallCenterTaskById(taskId: number): Promise<TaskCallCenterEntity> {
+    const task = await this.taskCallCenterRepo.findOne({
+      where: { id: taskId },
+      relations: ['assignedTo', 'sprint'],
+    });
+    if (!task) throw new NotFoundException(`CallCenter Task #${taskId} not found`);
+    return task;
+  }
+
+ async updateCallCenterTaskStatus(
+  taskId: number,
+  status: string,
+  user: UserEntity,
+): Promise<TaskCallCenterEntity> {
+  const task = await this.getCallCenterTaskById(taskId);
+  const previousStatus = task.status;
+
+  task.status = status as any;
+
+  // ✅ Enregistrer l'historique AVEC LE DOMAINE
+  await this.taskHistoryService.recordTaskStatusChange(
+    task.id,
+    status,
+    'CallCenter', // ← Spécifier le domaine
+  );
+
+  return this.taskCallCenterRepo.save(task);
+}
+
+async updateCallCenterTask(
+  taskId: number,
+  dto: UpdateTaskCallCenterDto,
+  user: UserEntity,
+): Promise<TaskCallCenterEntity> {
+  const task = await this.getCallCenterTaskById(taskId);
+  const { assignedTo, ...rest } = dto as any;
+  const previousStatus = task.status;
+
+  Object.assign(task, rest);
+
+  if (assignedTo?.id) {
+    const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+    if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
+    task.assignedTo = member;
+  }
+
+  // ✅ Enregistrer l'historique si le statut change
+  if (dto.status && dto.status !== previousStatus) {
+    await this.taskHistoryService.recordTaskStatusChange(
+      task.id,
+      dto.status as string,
+      'CallCenter',
+    );
+  }
+
+  if (dto.status === 'DONE' && !task.completedAt) {
+    task.completedAt = new Date();
+    if (task.scheduledEndDate) {
+      const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
+      task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+    }
+  }
+
+  return this.taskCallCenterRepo.save(task);
+}
+  async deleteCallCenterTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
+    const task = await this.getCallCenterTaskById(taskId);
+    await this.taskCallCenterRepo.remove(task);
+    return { message: `CallCenter Task #${taskId} deleted successfully` };
+  }
+
+ 
 }

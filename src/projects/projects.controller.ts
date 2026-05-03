@@ -26,9 +26,15 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { Query } from '@nestjs/common';
-
+import { TaskHistoryService } from 'src/taskhystory/task-history.service';
 import { UpdateSprintITDto } from './dto/update-sprint-it.dto';
 import { UpdateTaskITDto } from './dto/update-task-it.dto';
+import { CreateSprintMarketingDto, CreateTaskMarketingDto } from './dto/create-sprint-marketing.dto';
+import { UpdateSprintMarketingDto } from './dto/update-sprint-marketing.dto';
+import { UpdateTaskMarketingDto } from './dto/update-task-marketing.dto';
+import { CreateSprintCallCenterDto, CreateTaskCallCenterDto } from './dto/create-sprint-callcenter.dto';
+import { UpdateSprintCallCenterDto } from './dto/update-sprint-callcenter.dto';
+import { UpdateTaskCallCenterDto } from './dto/update-task-callcenter.dto';
 
 interface RequestWithUser extends Request {
   user?: UserEntity;
@@ -36,7 +42,9 @@ interface RequestWithUser extends Request {
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(private readonly projectsService: ProjectsService,
+              private readonly taskHistoryService: TaskHistoryService
+  ) {}
 
   // 🔹 Créer un projet (Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -325,7 +333,12 @@ async getTaskDelayInfo(@Param('taskId', ParseIntPipe) taskId: number) {
   return this.projectsService.getTaskDelayInfo(taskId);
 }
 
-
+@UseGuards(JwtAuthGuard)
+@Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER, UserRole.MEMBER)
+@Get('tasks/:taskId/history')
+async getTaskHistory(@Param('taskId', ParseIntPipe) taskId: number) {
+  return this.taskHistoryService.getTaskHistory(taskId);
+}
   @UseGuards(JwtAuthGuard)
   @Patch('tasks/:taskId/status')
   async updateTaskStatus(
@@ -334,5 +347,189 @@ async getTaskDelayInfo(@Param('taskId', ParseIntPipe) taskId: number) {
     @Req() req: RequestWithUser,
   ) {
     return this.projectsService.updateTaskStatus(taskId, status, req.user as UserEntity);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 📊 MARKETING SPRINTS
+  // ════════════════════════════════════════════════════════════════════
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER)
+  @Post(':projectId/marketing-sprints')
+  async createMarketingSprints(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body() sprintsDto: CreateSprintMarketingDto[],
+  ) {
+    return this.projectsService.createMarketingSprints(projectId, sprintsDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('marketing-sprints/:sprintId')
+  async getMarketingSprintById(@Param('sprintId', ParseIntPipe) sprintId: number) {
+    return this.projectsService.getMarketingSprintById(sprintId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Patch('marketing-sprints/:sprintId')
+  async updateMarketingSprint(
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Body() dto: UpdateSprintMarketingDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.updateMarketingSprint(sprintId, dto, req.user as UserEntity);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Delete('marketing-sprints/:sprintId')
+  async deleteMarketingSprint(
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.deleteMarketingSprint(sprintId, req.user as UserEntity);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // 📊 MARKETING TASKS
+  // ─────────────────────────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER)
+  @Post('marketing-sprints/:sprintId/tasks')
+  async addTaskToMarketingSprint(
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Body() taskDto: CreateTaskMarketingDto,
+  ) {
+    return this.projectsService.addTaskToMarketingSprint(sprintId, taskDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('marketing-tasks/:taskId')
+  async getMarketingTaskById(@Param('taskId', ParseIntPipe) taskId: number) {
+    return this.projectsService.getMarketingTaskById(taskId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Patch('marketing-tasks/:taskId')
+  async updateMarketingTask(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: UpdateTaskMarketingDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.updateMarketingTask(taskId, dto, req.user as UserEntity);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Delete('marketing-tasks/:taskId')
+  async deleteMarketingTask(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.deleteMarketingTask(taskId, req.user as UserEntity);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('marketing-tasks/:taskId/status')
+  async updateMarketingTaskStatus(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body('status') status: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.updateMarketingTaskStatus(taskId, status, req.user as UserEntity);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // 📞 CALLCENTER SPRINTS
+  // ════════════════════════════════════════════════════════════════════
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER)
+  @Post(':projectId/callcenter-sprints')
+  async createCallCenterSprints(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body() sprintsDto: CreateSprintCallCenterDto[],
+  ) {
+    return this.projectsService.createCallCenterSprints(projectId, sprintsDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('callcenter-sprints/:sprintId')
+  async getCallCenterSprintById(@Param('sprintId', ParseIntPipe) sprintId: number) {
+    return this.projectsService.getCallCenterSprintById(sprintId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Patch('callcenter-sprints/:sprintId')
+  async updateCallCenterSprint(
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Body() dto: UpdateSprintCallCenterDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.updateCallCenterSprint(sprintId, dto, req.user as UserEntity);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Delete('callcenter-sprints/:sprintId')
+  async deleteCallCenterSprint(
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.deleteCallCenterSprint(sprintId, req.user as UserEntity);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // 📞 CALLCENTER TASKS
+  // ─────────────────────────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER)
+  @Post('callcenter-sprints/:sprintId/tasks')
+  async addTaskToCallCenterSprint(
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @Body() taskDto: CreateTaskCallCenterDto,
+  ) {
+    return this.projectsService.addTaskToCallCenterSprint(sprintId, taskDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('callcenter-tasks/:taskId')
+  async getCallCenterTaskById(@Param('taskId', ParseIntPipe) taskId: number) {
+    return this.projectsService.getCallCenterTaskById(taskId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Patch('callcenter-tasks/:taskId')
+  async updateCallCenterTask(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: UpdateTaskCallCenterDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.updateCallCenterTask(taskId, dto, req.user as UserEntity);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER)
+  @Delete('callcenter-tasks/:taskId')
+  async deleteCallCenterTask(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.deleteCallCenterTask(taskId, req.user as UserEntity);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('callcenter-tasks/:taskId/status')
+  async updateCallCenterTaskStatus(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body('status') status: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.projectsService.updateCallCenterTaskStatus(taskId, status, req.user as UserEntity);
   }
 }

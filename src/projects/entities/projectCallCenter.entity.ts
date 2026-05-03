@@ -5,9 +5,11 @@ import {
   CreateDateColumn, 
   UpdateDateColumn,
   OneToOne,
-  JoinColumn
+  JoinColumn,
+  OneToMany
 } from 'typeorm';
 import { ProjectEntity } from './project.entity';
+import { SprintCallCenterEntity } from './SprintCallCenterEntity.entity';
 
 @Entity('project_callcenter')
 export class ProjectCallCenterEntity {
@@ -55,6 +57,8 @@ export class ProjectCallCenterEntity {
 
   @Column({ nullable: true })
   additionalNotes: string;
+  @OneToMany(() => SprintCallCenterEntity, sprint => sprint.project)
+  sprints: SprintCallCenterEntity[];
 
   @CreateDateColumn()
   createdAt: Date;
