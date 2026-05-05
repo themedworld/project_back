@@ -10,9 +10,12 @@ import {
   UseGuards,
   Req,
   UnauthorizedException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 
 import { Request } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { PostsService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -39,8 +42,7 @@ export class PostsController {
   ) {}
 
   // =========================
-  // ONLY HR CAN CONSULT POSTS
-  // Each HR sees only his posts
+  // HR CAN CONSULT POSTS
   // =========================
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,7 +51,6 @@ export class PostsController {
   findAll(@Req() req: RequestWithUser) {
     return this.postsService.findAll(req.user);
   }
-
 
   @Get(':id')
   findOne(
@@ -123,15 +124,31 @@ export class PostsController {
   }
 
   // =========================
-  // PUBLIC APPLY (NO AUTH)
+  // PUBLIC APPLY (WITH FILE UPLOAD)
   // =========================
 
   @HttpPost(':id/apply')
-  apply(
+  @UseInterceptors(FileInterceptor('cv'))
+  async apply(
     @Param('id') id: string,
     @Body() dto: ApplyPostDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.postsService.applyToPost(id, dto);
+    return this.postsService.applyToPost(id, dto, file);
+  }
+
+  // =========================
+  // GET APPLICANTS WITH SCORES (HR ONLY)
+  // =========================
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HR_MANAGER)
+  @Get(':id/applicants')
+  getApplicants(
+    @Param('id') id: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.postsService.getApplicantsWithScores(id, req.user);
   }
 
   // =========================
