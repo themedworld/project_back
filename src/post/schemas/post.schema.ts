@@ -1,16 +1,15 @@
-// src/post/schemas/post.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
 export type PostDocument = Post & Document;
-export type ApplicantDocument = Applicant & Document;
 
 // ============================================
-// SCHEMA APPLICANT (Candidat)
+// APPLICANT SUB-SCHEMA
 // ============================================
 
-@Schema({ timestamps: true })
+@Schema({ _id: true, timestamps: true })
 export class Applicant {
+  // ── Infos de base ──────────────────────────
   @Prop({ required: true })
   name: string;
 
@@ -23,159 +22,150 @@ export class Applicant {
   @Prop()
   cvLink?: string;
 
-  // ========== DONNÉES EXTRAITES DU CV ==========
+  // ── Données extraites du CV ────────────────
+  @Prop({ default: '' })
+  experience_text: string;
 
-  @Prop({ type: String })
-  experience_text?: string; // Texte brut de l'expérience
+  @Prop({ default: 0 })
+  years_experience: number;
 
-  @Prop({ type: Number, default: 0 })
-  years_experience?: number; // Nombre d'années d'expérience
+  @Prop({ default: '' })
+  education_text: string;
 
-  @Prop({ type: String })
-  education_text?: string; // Texte brut de la formation
-
-  @Prop({ type: Number, default: 0 })
-  years_education?: number; // Nombre d'années de formation
+  @Prop({ default: 0 })
+  years_education: number;
 
   @Prop({ type: [String], default: [] })
-  skills?: string[]; // Liste des compétences extraites
+  skills: string[];
 
-  @Prop({ type: String, enum: ['Junior', 'Intermédiaire', 'Senior/Expert'], default: 'Junior' })
-  level?: string; // Niveau estimé (Junior/Intermédiaire/Senior)
+  @Prop({
+    type: String,
+    enum: ['Junior', 'Intermédiaire', 'Senior/Expert'],
+    default: 'Junior',
+  })
+  level: string;
 
-  // ========== SCORING ET MATCHING ==========
+  // ── Scores individuels (0-100) ─────────────
+  @Prop({ type: Number, default: 0, min: 0, max: 100 })
+  experienceScore: number;
 
-  @Prop({ type: Number, default: 0 })
-  score?: number; // Score de matching avec le poste (0-100)
+  @Prop({ type: Number, default: 0, min: 0, max: 100 })
+  educationScore: number;
 
-  @Prop({ type: Number, default: 0 })
-  experienceScore?: number; // Score expérience (0-100)
+  @Prop({ type: Number, default: 0, min: 0, max: 100 })
+  skillsScore: number;
 
-  @Prop({ type: Number, default: 0 })
-  educationScore?: number; // Score formation (0-100)
+  @Prop({ type: Number, default: 0, min: 0, max: 100 })
+  levelScore: number;
 
-  @Prop({ type: Number, default: 0 })
-  skillsScore?: number; // Score compétences (0-100)
+  // ── Score total pondéré (0-100) ────────────
+  @Prop({ type: Number, default: 0, min: 0, max: 100 })
+  score: number;
 
-  @Prop({ type: Number, default: 0 })
-  levelScore?: number; // Score niveau demandé (0-100)
-
-  @Prop({ type: String })
-  cvParsingStatus?: string; // "pending" | "success" | "failed"
+  // ── Méta ──────────────────────────────────
+  @Prop({
+    type: String,
+    enum: ['pending', 'success', 'failed'],
+    default: 'pending',
+  })
+  cvParsingStatus: string;
 
   @Prop({ default: Date.now })
   appliedAt: Date;
 
   @Prop()
-  cvParsedAt?: Date; // Date du parsing du CV
+  cvParsedAt?: Date;
 }
 
 export const ApplicantSchema = SchemaFactory.createForClass(Applicant);
 
 // ============================================
-// SCHEMA POST (Offre d'emploi)
+// POST SCHEMA
 // ============================================
 
 @Schema({ timestamps: true })
 export class Post {
   @Prop({ required: true })
-  title: string; // Titre du poste (ex: "Développeur Full Stack")
+  title: string;
 
-  @Prop({ type: String, required: true })
-  description: string; // Description générale du poste
+  @Prop({ required: true })
+  description: string;
 
-  // ========== REQUIREMENTS D'EXPÉRIENCE ==========
-
-  @Prop({ type: String })
-  experienceDescription?: string; // Description du type d'expérience souhaité
-  // Ex: "Expérience en développement backend avec Python et FastAPI"
+  // ── Expérience ─────────────────────────────
+  @Prop({ default: '' })
+  experienceDescription: string;
 
   @Prop({ type: Number, default: 0 })
-  minYearsExperience?: number; // Nombre minimum d'années (ex: 2)
+  minYearsExperience: number;
 
   @Prop({ type: Number })
-  maxYearsExperience?: number; // Nombre maximum d'années (ex: 5)
+  maxYearsExperience?: number;
 
-  // ========== REQUIREMENTS DE FORMATION ==========
-
-  @Prop({ type: String })
-  educationDescription?: string; // Description de la formation requise
-  // Ex: "Master Informatique ou équivalent"
+  // ── Formation ──────────────────────────────
+  @Prop({ default: '' })
+  educationDescription: string;
 
   @Prop({ type: Number, default: 0 })
-  minYearsEducation?: number; // Nombre minimum d'années de formation
+  minYearsEducation: number;
 
-  // ========== REQUIREMENTS DE COMPÉTENCES ==========
+  // ── Compétences ────────────────────────────
+  @Prop({ type: [String], default: [] })
+  requiredSkills: string[];
 
   @Prop({ type: [String], default: [] })
-  requiredSkills?: string[]; // Compétences obligatoires
-  // Ex: ["Python", "FastAPI", "PostgreSQL", "Docker"]
+  preferredSkills: string[];
+
+  @Prop({ default: '' })
+  skillsDescription: string;
+
+  // ── Niveau ─────────────────────────────────
+  @Prop({
+    type: String,
+    enum: ['Junior', 'Intermédiaire', 'Senior/Expert'],
+    required: true,
+  })
+  requiredLevel: string;
+
+  @Prop({ default: '' })
+  levelDescription: string;
+
+  // ── Tags & Keywords ────────────────────────
+  @Prop({ type: [String], default: [] })
+  keywords: string[];
 
   @Prop({ type: [String], default: [] })
-  preferredSkills?: string[]; // Compétences appréciées
-  // Ex: ["Kubernetes", "AWS", "Redis"]
+  tags: string[];
 
-  @Prop({ type: String })
-  skillsDescription?: string; // Description des compétences requises
-  // Ex: "Expertise en Python, FastAPI, bases de données relationnelles"
-
-  // ========== REQUIREMENTS DE NIVEAU ==========
-
-  @Prop({ type: String, enum: ['Junior', 'Intermédiaire', 'Senior/Expert'], required: true })
-  requiredLevel: string; // Niveau requis pour le poste
-
-  @Prop({ type: String })
-  levelDescription?: string; // Description du niveau requis
-  // Ex: "Professionnel expérimenté avec leadership"
-
-  // ========== KEYWORDS ET TAGS ==========
-
-  @Prop({ type: [String], default: [] })
-  keywords: string[]; // Mots-clés du poste
-
-  @Prop({ type: [String], default: [] })
-  tags?: string[]; // Tags additionnels (ex: ["Remote", "CDI", "Urgent"])
-
-  // ========== MÉTADONNÉES DU POSTE ==========
-
+  // ── Métadonnées ────────────────────────────
   @Prop({ default: true })
-  isActive: boolean; // Le poste est-il actif ?
+  isActive: boolean;
 
+  @Prop({ required: true })
+  createdById: string;
+
+  @Prop()
+  createdByRole?: string;
+
+  @Prop()
+  companyId?: string;
+
+  // ── Candidats ─────────────────────────────
   @Prop({ type: [ApplicantSchema], default: [] })
-  applicants: Applicant[]; // Liste des candidats
+  applicants: Applicant[];
 
   @Prop({ type: Number, default: 0 })
-  applicantsCount?: number; // Nombre de candidats
+  applicantsCount: number;
 
   @Prop({ type: Number, default: 0 })
-  matchedApplicantsCount?: number; // Nombre de candidats avec score >= 70
+  matchedApplicantsCount: number; // score >= 70
 
-  // ========== IDS ET RÉFÉRENCES ==========
-
-  @Prop({ type: String, required: true })
-  createdById: string; // ID du RH qui a créé le poste
-
-  @Prop({ type: String, required: false })
-  createdByRole?: string; // Rôle du créateur (ex: "recruiter", "manager")
-
-  @Prop({ type: String, required: false })
-  companyId?: string; // ID de la compagnie
-
-  // ========== SCORING GLOBAL ==========
-
-  @Prop({ type: Number, default: 0, index: true })
-  score?: number; // Score moyen des candidats
-
-  @Prop({ type: Date, default: Date.now })
-  createdAt?: Date;
-
-  @Prop({ type: Date })
-  updatedAt?: Date;
+  // ── Score moyen de tous les candidats ─────
+  @Prop({ type: Number, default: 0 })
+  score: number;
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
 
-// Ajouter des index pour les recherches
 PostSchema.index({ createdById: 1, isActive: 1 });
 PostSchema.index({ companyId: 1 });
 PostSchema.index({ requiredLevel: 1 });

@@ -13,37 +13,28 @@ import {
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
-
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import type { Express } from 'express';
 
 import { PostsService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ApplyPostDto } from './dto/apply-post.dto';
-
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/user/entities/user.entity';
 
 interface RequestWithUser extends Request {
-  user?: {
-    id?: string;
-    role?: string;
-    companyId?: string;
-  };
+  user?: { id?: string; role?: string; companyId?: string };
 }
 
 @Controller('posts')
 export class PostsController {
-  constructor(
-    private readonly postsService: PostsService,
-  ) {}
-
-  // =========================
-  // HR CAN CONSULT POSTS
-  // =========================
+  constructor(private readonly postsService: PostsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HR_MANAGER)
@@ -53,43 +44,17 @@ export class PostsController {
   }
 
   @Get(':id')
-  findOne(
-    @Param('id') id: string,
-    @Req() req: RequestWithUser,
-  ) {
+  findOne(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.postsService.findOne(id, req.user);
   }
-
-  // =========================
-  // CREATE POST (HR ONLY)
-  // =========================
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HR_MANAGER)
   @HttpPost()
-  create(
-    @Body() dto: CreatePostDto,
-    @Req() req: RequestWithUser,
-  ) {
-    const user = req.user;
-
-    if (!user?.id) {
-      throw new UnauthorizedException(
-        'Utilisateur non authentifié',
-      );
-    }
-
-    return this.postsService.create(
-      dto,
-      user.id,
-      user.role,
-      user.companyId,
-    );
+  create(@Body() dto: CreatePostDto, @Req() req: RequestWithUser) {
+    if (!req.user?.id) throw new UnauthorizedException('Utilisateur non authentifié');
+    return this.postsService.create(dto, req.user.id, req.user.role, req.user.companyId);
   }
-
-  // =========================
-  // UPDATE POST (OWNER HR)
-  // =========================
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HR_MANAGER)
@@ -99,36 +64,33 @@ export class PostsController {
     @Body() dto: UpdatePostDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.postsService.update(
-      id,
-      dto,
-      req.user,
-    );
+    return this.postsService.update(id, dto, req.user);
   }
-
-  // =========================
-  // DELETE POST (OWNER HR)
-  // =========================
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HR_MANAGER)
   @Delete(':id')
-  remove(
-    @Param('id') id: string,
-    @Req() req: RequestWithUser,
-  ) {
-    return this.postsService.remove(
-      id,
-      req.user,
-    );
+  remove(@Param('id') id: string, @Req() req: RequestWithUser) {
+    return this.postsService.remove(id, req.user);
   }
 
-  // =========================
-  // PUBLIC APPLY (WITH FILE UPLOAD)
-  // =========================
-
+  // ── Candidature publique avec upload CV ──
   @HttpPost(':id/apply')
-  @UseInterceptors(FileInterceptor('cv'))
+  @UseInterceptors(
+    FileInterceptor('cv', {
+      storage: diskStorage({
+        destination: './uploads/cvs',
+        filename: (_, file, cb) =>
+          cb(null, `${Date.now()}${extname(file.originalname)}`),
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+      fileFilter: (_, file, cb) => {
+        const allowed = ['.pdf', '.doc', '.docx'];
+        const ext = extname(file.originalname).toLowerCase();
+        cb(null, allowed.includes(ext));
+      },
+    }),
+  )
   async apply(
     @Param('id') id: string,
     @Body() dto: ApplyPostDto,
@@ -137,23 +99,12 @@ export class PostsController {
     return this.postsService.applyToPost(id, dto, file);
   }
 
-  // =========================
-  // GET APPLICANTS WITH SCORES (HR ONLY)
-  // =========================
-
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HR_MANAGER)
   @Get(':id/applicants')
-  getApplicants(
-    @Param('id') id: string,
-    @Req() req: RequestWithUser,
-  ) {
+  getApplicants(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.postsService.getApplicantsWithScores(id, req.user);
   }
-
-  // =========================
-  // REMOVE APPLICANT (OWNER HR)
-  // =========================
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HR_MANAGER)
@@ -163,10 +114,6 @@ export class PostsController {
     @Param('email') email: string,
     @Req() req: RequestWithUser,
   ) {
-    return this.postsService.removeApplicant(
-      id,
-      email,
-      req.user,
-    );
+    return this.postsService.removeApplicant(id, email, req.user);
   }
 }
