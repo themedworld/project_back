@@ -358,14 +358,39 @@ async findAll(user: UserEntity) {
   }
 
   // 🔹 Mettre à jour projet
-  async update(id: number, dto: UpdateProjectDto) {
-    const project = await this.projectRepo.findOne({ where: { id } });
+// 🔹 Mettre à jour projet
+async update(id: number, dto: UpdateProjectDto) {
+  const project = await this.projectRepo.findOne({ 
+    where: { id },
+    relations: ['projectManager', 'company'], // 👈 Charger les relations
+  });
 
-    if (!project) throw new NotFoundException('Project not found');
+  if (!project) throw new NotFoundException('Project not found');
 
+  // ✅ Traiter projectManagerId spécialement
+  if (dto.projectManagerId !== undefined) {
+    if (dto.projectManagerId === null) {
+      project.projectManager = null;
+    } else {
+      const pm = await this.userRepo.findOne({
+        where: { 
+          id: dto.projectManagerId, 
+          role: UserRole.PROJECT_MANAGER 
+        }
+      });
+      if (!pm) throw new NotFoundException(`Project Manager not found`);
+      project.projectManager = pm;
+    }
+    
+    // Enlever projectManagerId du DTO pour éviter les doublons
+    const { projectManagerId, ...rest } = dto;
+    Object.assign(project, rest);
+  } else {
     Object.assign(project, dto);
-    return this.projectRepo.save(project);
   }
+
+  return this.projectRepo.save(project);
+}
 
   // 🔹 Supprimer projet
   async remove(id: number) {

@@ -35,7 +35,7 @@ export class ProjectCallCenterEntity {
   slaTarget: string; // SLA: "80% calls < 1 min"
 
   @Column({ nullable: true })
-  averageHandleTime: string; // Durée moyenne d'appel
+  averageHandleTime: string; 
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   estimatedBudget: number; // Budget pour le projet call center
