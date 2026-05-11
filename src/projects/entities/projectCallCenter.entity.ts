@@ -1,62 +1,56 @@
-import { 
-  Entity, 
-  Column, 
-  PrimaryGeneratedColumn, 
-  CreateDateColumn, 
-  UpdateDateColumn,
-  OneToOne,
-  JoinColumn,
-  OneToMany
-} from 'typeorm';
-import { ProjectEntity } from './project.entity';
-import { SprintCallCenterEntity } from './SprintCallCenterEntity.entity';
-
 @Entity('project_callcenter')
 export class ProjectCallCenterEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  // Relation One-to-One avec Project
   @OneToOne(() => ProjectEntity, project => project.callCenterDetails, { onDelete: 'CASCADE' })
   @JoinColumn()
   project: ProjectEntity;
 
-  // Informations opérationnelles
   @Column({ type: 'int', nullable: true })
-  numberOfAgents: number; // Nombre d'agents assignés
+  numberOfAgents: number;
 
   @Column({ type: 'int', nullable: true })
-  numberOfCallsPerDay: number; // Volume de calls estimé
+  numberOfCallsPerDay: number;
 
   @Column({ nullable: true })
-  callTypes: string; // Ex: "Support, Vente, Technique"
+  callTypes: string; // ex: "Tech;Support;Sales"
 
-  @Column({ nullable: true })
-  slaTarget: string; // SLA: "80% calls < 1 min"
+  // ── MODIFIÉ : était string, maintenant int (secondes) ──
+  @Column({ type: 'int', nullable: true })
+  slaTargetSeconds: number;
 
-  @Column({ nullable: true })
-  averageHandleTime: string; 
-
+  // ── MODIFIÉ : était string, maintenant float (secondes) ──
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  estimatedBudget: number; // Budget pour le projet call center
+  averageHandleTimeSec: number;
 
   @Column({ type: 'int', nullable: true })
-  estimatedDurationDays: number; // Durée estimée du projet
+  estimatedDurationDays: number;
+
+  // ── NOUVEAU ──
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  CSAT: number;
+
+  // ── NOUVEAU ──
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  FCR: number;
+
+  // ── NOUVEAU ──
+  @Column({ type: 'decimal', precision: 4, scale: 2, nullable: true })
+  risksScore: number;
 
   @Column({ nullable: true })
-  mainGoals: string; // Satisfaction client, Résolution rapide, Conversion
+  dependencies: string; // ex: "AI;CRM;IVR"
 
   @Column({ nullable: true })
-  keyMetrics: string; // CSAT, FCR, AHT, NPS, % SLA atteint
-
-  @Column({ nullable: true })
-  dependencies: string; // Systèmes CRM, Formation agents, logiciels téléphoniques
-
-  @Column({ nullable: true })
-  risks: string; // Absentéisme, Volume d'appel plus élevé que prévu
+  mainGoals: string;
 
   @Column({ nullable: true })
   additionalNotes: string;
+
+  @Column({ type: 'int', nullable: true })
+  teamSize: number;
+
   @OneToMany(() => SprintCallCenterEntity, sprint => sprint.project)
   sprints: SprintCallCenterEntity[];
 

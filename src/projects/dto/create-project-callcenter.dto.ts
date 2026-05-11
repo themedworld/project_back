@@ -1,14 +1,15 @@
 export class CreateProjectCallCenterDto {
   numberOfAgents?: number;
   numberOfCallsPerDay?: number;
-  callTypes?: string;
-  slaTarget?: string;
-  averageHandleTime?: string;
-  estimatedBudget?: number;
+  callTypes?: string;          // "Tech;Support;Sales"
+  slaTargetSeconds?: number;   // remplace slaTarget (string)
+  averageHandleTimeSec?: number; // remplace averageHandleTime (string)
   estimatedDurationDays?: number;
+  CSAT?: number;
+  FCR?: number;
+  risksScore?: number;
+  dependencies?: string;       // "AI;CRM;IVR"
   mainGoals?: string;
-  keyMetrics?: string;
-  dependencies?: string;
-  risks?: string;
   additionalNotes?: string;
+  teamSize?: number;
 }
