@@ -805,8 +805,8 @@ async getTaskDelayInfo(taskId: number) {
     for (const sprintDto of sprintsDto) {
       const sprint = this.sprintMarketingRepo.create({
         name: sprintDto.name,
-        startDate: new Date(sprintDto.startDate),
-        endDate: new Date(sprintDto.endDate),
+startDate: new Date(sprintDto.startDate ?? new Date()),
+endDate: new Date(sprintDto.endDate ?? new Date()),
         status: 'planned',
         totalBudget: sprintDto.totalBudget,
         campaignType: sprintDto.campaignType,
@@ -824,22 +824,22 @@ async getTaskDelayInfo(taskId: number) {
     if (sprintDto.tasks && sprintDto.tasks.length > 0) {
   for (const taskDto of sprintDto.tasks) {
     // ✅ Créer directement sans .create()
-    const task = new TaskMarketingEntity();
-    task.title = taskDto.title;
-    task.description = taskDto.description;
-    task.type = taskDto.type as any;
-    task.status = (taskDto.status || 'TO_DO') as any;
-    task.priority = taskDto.priority as any;
-    task.estimatedHours = taskDto.estimatedHours;
-    task.budget = taskDto.budget;
-    task.expectedViews = taskDto.expectedViews;
-    task.expectedClicks = taskDto.expectedClicks;
-    task.expectedLeads = taskDto.expectedLeads;
-    task.expectedConversions = taskDto.expectedConversions;
-    task.expectedCTR = taskDto.expectedCTR as any;
-    task.channel = taskDto.channel;
-    task.scheduledEndDate = taskDto.scheduledEndDate;
-    task.sprint = savedSprint;
+   const task = new TaskMarketingEntity();
+task.title = taskDto.title;
+task.description        = taskDto.description        ?? '';
+task.type = taskDto.type as any ?? '';
+task.status = (taskDto.status || 'TO_DO') as any;
+task.priority = taskDto.priority as any ?? '';
+task.estimatedHours     = taskDto.estimatedHours     ?? 0;
+task.budget             = taskDto.budget             ?? 0;
+task.expectedViews      = taskDto.expectedViews      ?? 0;
+task.expectedClicks     = taskDto.expectedClicks     ?? 0;
+task.expectedLeads      = taskDto.expectedLeads      ?? 0;
+task.expectedConversions = taskDto.expectedConversions ?? 0;
+task.expectedCTR = taskDto.expectedCTR as any ?? 0;
+task.channel            = taskDto.channel            ?? '';
+task.scheduledEndDate   = taskDto.scheduledEndDate   ?? new Date();
+task.sprint = savedSprint;
 
     if (taskDto.assignedToId) {
       task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
@@ -866,21 +866,21 @@ async getTaskDelayInfo(taskId: number) {
 
   // ✅ Créer directement sans déstructuration problématique
   const task = new TaskMarketingEntity();
-  task.title = taskDto.title;
-  task.description = taskDto.description;
-  task.type = taskDto.type as any;
-  task.status = (taskDto.status || 'TO_DO') as any;
-  task.priority = taskDto.priority as any;
-  task.estimatedHours = taskDto.estimatedHours;
-  task.budget = taskDto.budget;
-  task.expectedViews = taskDto.expectedViews;
-  task.expectedClicks = taskDto.expectedClicks;
-  task.expectedLeads = taskDto.expectedLeads;
-  task.expectedConversions = taskDto.expectedConversions;
-  task.expectedCTR = taskDto.expectedCTR as any;
-  task.channel = taskDto.channel;
-  task.scheduledEndDate = taskDto.scheduledEndDate;
-  task.sprint = sprint;
+task.title = taskDto.title;
+task.description        = taskDto.description        ?? '';
+task.type = taskDto.type as any ?? '';
+task.status = (taskDto.status || 'TO_DO') as any;
+task.priority = taskDto.priority as any ?? '';
+task.estimatedHours     = taskDto.estimatedHours     ?? 0;
+task.budget             = taskDto.budget             ?? 0;
+task.expectedViews      = taskDto.expectedViews      ?? 0;
+task.expectedClicks     = taskDto.expectedClicks     ?? 0;
+task.expectedLeads      = taskDto.expectedLeads      ?? 0;
+task.expectedConversions = taskDto.expectedConversions ?? 0;
+task.expectedCTR = taskDto.expectedCTR as any ?? 0;
+task.channel            = taskDto.channel            ?? '';
+task.scheduledEndDate   = taskDto.scheduledEndDate   ?? new Date();
+task.sprint = sprint;
 
   if (taskDto.assignedToId) {
     task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
