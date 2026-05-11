@@ -1,54 +1,50 @@
 import { IsString, IsOptional, IsNumber, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateTaskMarketingDto {
-  @IsOptional()
-  @IsString()
+  @IsOptional() @IsString()
   title?: string;
 
-  @IsOptional()
-  @IsString()
+  @IsOptional() @IsString()
   description?: string;
 
-  @IsOptional()
-  @IsString()
+  @IsOptional() @IsString()
   status?: string;
 
-  @IsOptional()
-  @IsNumber()
-  priority?: number;
+  @IsOptional() @IsString()          // ✅ FIX #5 : string pas number
+  priority?: string;
 
-  @IsOptional()
-  @IsNumber()
+  @IsOptional() @IsNumber()
   estimatedHours?: number;
 
-  @IsOptional()
-  @IsNumber()
+  @IsOptional() @IsNumber()
   budget?: number;
 
-  @IsOptional()
-  @IsNumber()
+  @IsOptional() @IsNumber()
   expectedViews?: number;
 
-  @IsOptional()
-  @IsNumber()
+  @IsOptional() @IsNumber()
+  expectedClicks?: number;           // ✅ FIX : champ manquant ajouté
+
+  @IsOptional() @IsNumber()
   expectedLeads?: number;
 
-  @IsOptional()
-  @IsNumber()
+  @IsOptional() @IsNumber()
   expectedConversions?: number;
 
-  @IsOptional()
-  @IsString()
+  @IsOptional() @IsNumber()
+  expectedCTR?: number;              // ✅ FIX #3 : number cohérent
+
+  @IsOptional() @IsString()
   channel?: string;
 
-  @IsOptional()
-  assignedTo?: { id: number };
+  @IsOptional() @IsNumber()
+  assignedToId?: number;             // ✅ FIX #4 : plat, pas { id: number }
+
+  @IsOptional() @IsString()
+  type?: string;                     // ✅ FIX : champ manquant ajouté
 
   @IsOptional()
-  @IsDate()
+  @Type(() => Date)
   scheduledEndDate?: Date;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
 }

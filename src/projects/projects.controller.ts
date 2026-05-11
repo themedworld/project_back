@@ -188,7 +188,25 @@ async findAll(@Req() req) {
   ) {
     return this.projectsService.update(id, dto);
   }
+// Ajouter juste AVANT le bloc MARKETING SPRINTS existant
 
+@UseGuards(JwtAuthGuard)
+@Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
+@Get(':projectId/marketing-sprints')
+async getMarketingSprints(
+  @Param('projectId', ParseIntPipe) projectId: number,
+) {
+  return this.projectsService.getMarketingSprintsOfProject(projectId);
+}
+
+@UseGuards(JwtAuthGuard)
+@Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
+@Get(':projectId/callcenter-sprints')
+async getCallCenterSprints(
+  @Param('projectId', ParseIntPipe) projectId: number,
+) {
+  return this.projectsService.getCallCenterSprintsOfProject(projectId);
+}
   // 🔹 Supprimer un projet (Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER)
@@ -196,10 +214,6 @@ async findAll(@Req() req) {
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.remove(id);
   }
-
-
-
-
   // 🔹 Affecter une tâche d'un sprint à un membre (Project Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROJECT_MANAGER)

@@ -388,7 +388,25 @@ async findAll(user: UserEntity) {
 
     return this.projectRepo.save(project);
   }
+// Ajouter après getSprintsOfProjectIT()
 
+async getMarketingSprintsOfProject(projectId: number): Promise<SprintMarketingEntity[]> {
+  const project = await this.projectMarketingRepo.findOne({
+    where: { id: projectId },
+    relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
+  });
+  if (!project) throw new NotFoundException('Marketing Project not found');
+  return project.sprints ?? [];
+}
+
+async getCallCenterSprintsOfProject(projectId: number): Promise<SprintCallCenterEntity[]> {
+  const project = await this.projectCallCenterRepo.findOne({
+    where: { id: projectId },
+    relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
+  });
+  if (!project) throw new NotFoundException('CallCenter Project not found');
+  return project.sprints ?? [];
+}
   // 🔹 Supprimer projet
   async remove(id: number) {
     const project = await this.projectRepo.findOne({ where: { id } });
