@@ -1,13 +1,13 @@
 import { IsString, IsDate, IsOptional, IsNumber, IsArray } from 'class-validator';
-
+import { Type } from 'class-transformer';
 export class CreateSprintMarketingDto {
   @IsString()
   name: string;
-
-  @IsDate()
+  @IsOptional()
+  @Type(() => Date)
   startDate: Date;
-
-  @IsDate()
+  @IsOptional()
+  @Type(() => Date)
   endDate: Date;
 
   @IsOptional()
@@ -103,6 +103,6 @@ export class CreateTaskMarketingDto {
   assignedToId: number;
 
   @IsOptional()
-  @IsDate()
+  @Type(() => Date)
   scheduledEndDate: Date;
 }
