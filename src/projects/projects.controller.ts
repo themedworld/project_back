@@ -21,7 +21,6 @@ import { ProjectITDto } from './dto/create-project-it.dto';
 import { CreateTaskITDto } from './dto/create-task-it.dto';
 import { CreateSprintITDto } from './dto/create-sprint-it.dto';
 import { AddMembersByMemberDto } from './dto/add-members-by-member.dto';
-// Guards / Roles - ajustez les chemins si nécessaire
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
@@ -42,8 +41,9 @@ interface RequestWithUser extends Request {
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService,
-              private readonly taskHistoryService: TaskHistoryService
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly taskHistoryService: TaskHistoryService,
   ) {}
 
   // 🔹 Créer un projet (Manager)
@@ -57,36 +57,29 @@ export class ProjectsController {
     const manager = req.user as UserEntity;
     return this.projectsService.create(dto, manager);
   }
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles( UserRole.PROJECT_MANAGER)
-@Patch(':projectId/add-members-by-member')
-async addMembersByMember(
-  @Param('projectId', ParseIntPipe) projectId: number,
-  @Body() dto: AddMembersByMemberDto,
-  @Req() req: RequestWithUser,
-) {
-  const requester = req.user as UserEntity;
-  return this.projectsService.addMembersByProjectMember(
-    projectId,
-    dto.memberIds,
-    requester,
-  );
-}
-// projects.controller.ts (ajoutez l'endpoint suivant)
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROJECT_MANAGER)
+  @Patch(':projectId/add-members-by-member')
+  async addMembersByMember(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body() dto: AddMembersByMemberDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const requester = req.user as UserEntity;
+    return this.projectsService.addMembersByProjectMember(projectId, dto.memberIds, requester);
+  }
 
-
-@UseGuards(JwtAuthGuard, RolesGuard)
-
-@Get(':id/details')
-async getProjectDetails(
-  @Param('id', ParseIntPipe) id: number,
-  @Query('memberSearch') memberSearch?: string,
-  @Query('includeDomainDetails') includeDomainDetails?: string, // 'true'|'false'
-) {
-  const includeDomain = includeDomainDetails === undefined ? true : includeDomainDetails === 'true';
-  return this.projectsService.getProjectDetails(id, { memberSearch, includeDomainDetails: includeDomain });
-}
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/details')
+  async getProjectDetails(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('memberSearch') memberSearch?: string,
+    @Query('includeDomainDetails') includeDomainDetails?: string,
+  ) {
+    const includeDomain = includeDomainDetails === undefined ? true : includeDomainDetails === 'true';
+    return this.projectsService.getProjectDetails(id, { memberSearch, includeDomainDetails: includeDomain });
+  }
 
   // 🔹 Affecter un Project Manager à un projet (Manager only)
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -114,43 +107,41 @@ async getProjectDetails(
     return this.projectsService.addMembers(projectId, memberIds, projectManager);
   }
 
-  // 🔹 Ajouter détails IT (Manager)
+  // ─────────────────────────────────────────────────────────────────
+  // 🔹 Détails domaine — PATCH pour upsert (create or update)
+  // ─────────────────────────────────────────────────────────────────
+
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.MANAGER , UserRole.PROJECT_MANAGER)
-  @Post(':projectId/it-details')
+  @Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
+  @Patch(':projectId/it-details')           // ← PATCH
   async addITDetails(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() dto: ProjectITDto,
   ) {
-    const project = await this.projectsService.findOne(projectId);
-    return this.projectsService.addITDetails(project, dto);
+    return this.projectsService.upsertITDetails(projectId, dto);
   }
 
-  // 🔹 Ajouter détails Marketing (Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
-  @Post(':projectId/marketing-details')
+  @Patch(':projectId/marketing-details')    // ← PATCH
   async addMarketingDetails(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() dto: CreateProjectMarketingDto,
   ) {
-    const project = await this.projectsService.findOne(projectId);
-    return this.projectsService.addMarketingDetails(project, dto);
+    return this.projectsService.upsertMarketingDetails(projectId, dto);
   }
 
-  // 🔹 Ajouter détails CallCenter (Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
-  @Post(':projectId/callcenter-details')
+  @Patch(':projectId/callcenter-details')   // ← PATCH
   async addCallCenterDetails(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() dto: CreateProjectCallCenterDto,
   ) {
-    const project = await this.projectsService.findOne(projectId);
-    return this.projectsService.addCallCenterDetails(project, dto);
+    return this.projectsService.upsertCallCenterDetails(projectId, dto);
   }
 
-  // 🔹 Initialiser automatiquement les détails selon le domaine (Manager)
+  // 🔹 Initialiser automatiquement les détails selon le domaine
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
   @Post(':projectId/init-domain')
@@ -163,13 +154,12 @@ async getProjectDetails(
   }
 
   // 🔹 Voir tous les projets (authentifié)
-@UseGuards(JwtAuthGuard)
-@Get()
-async findAll(@Req() req) {
-  // On récupère l'utilisateur injecté par le JwtStrategy
-  const user = req.user; 
-  return this.projectsService.findAll(user);
-}
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  async findAll(@Req() req) {
+    const user = req.user;
+    return this.projectsService.findAll(user);
+  }
 
   // 🔹 Voir un projet (authentifié)
   @UseGuards(JwtAuthGuard)
@@ -188,25 +178,19 @@ async findAll(@Req() req) {
   ) {
     return this.projectsService.update(id, dto);
   }
-// Ajouter juste AVANT le bloc MARKETING SPRINTS existant
 
-@UseGuards(JwtAuthGuard)
-@Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
-@Get(':projectId/marketing-sprints')
-async getMarketingSprints(
-  @Param('projectId', ParseIntPipe) projectId: number,
-) {
-  return this.projectsService.getMarketingSprintsOfProject(projectId);
-}
+  @UseGuards(JwtAuthGuard)
+  @Get(':projectId/marketing-sprints')
+  async getMarketingSprints(@Param('projectId', ParseIntPipe) projectId: number) {
+    return this.projectsService.getMarketingSprintsOfProject(projectId);
+  }
 
-@UseGuards(JwtAuthGuard)
-@Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
-@Get(':projectId/callcenter-sprints')
-async getCallCenterSprints(
-  @Param('projectId', ParseIntPipe) projectId: number,
-) {
-  return this.projectsService.getCallCenterSprintsOfProject(projectId);
-}
+  @UseGuards(JwtAuthGuard)
+  @Get(':projectId/callcenter-sprints')
+  async getCallCenterSprints(@Param('projectId', ParseIntPipe) projectId: number) {
+    return this.projectsService.getCallCenterSprintsOfProject(projectId);
+  }
+
   // 🔹 Supprimer un projet (Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER)
@@ -214,6 +198,7 @@ async getCallCenterSprints(
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.remove(id);
   }
+
   // 🔹 Affecter une tâche d'un sprint à un membre (Project Manager)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROJECT_MANAGER)
@@ -227,14 +212,14 @@ async getCallCenterSprints(
     return this.projectsService.assignTaskToMember(taskId, memberId, projectManager);
   }
 
-  // 🔹 Récupérer tous les sprints d’un projet IT (authentifié)
+  // 🔹 Récupérer tous les sprints d'un projet IT
   @UseGuards(JwtAuthGuard)
   @Get(':projectId/sprints')
   async getSprints(@Param('projectId', ParseIntPipe) projectId: number) {
     return this.projectsService.getSprintsOfProjectIT(projectId);
   }
 
-  // 🔹 Récupérer toutes les tâches d’un sprint (authentifié)
+  // 🔹 Récupérer toutes les tâches d'un sprint
   @UseGuards(JwtAuthGuard)
   @Get('sprint/:sprintId/tasks')
   async getTasksOfSprint(@Param('sprintId', ParseIntPipe) sprintId: number) {
@@ -252,7 +237,9 @@ async getCallCenterSprints(
   ) {
     const manager = req.user as UserEntity;
     return this.projectsService.assignProjectToPM(projectId, pmId, manager);
-  } @UseGuards(JwtAuthGuard, RolesGuard)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROJECT_MANAGER)
   @Post(':projectId/sprints')
   async createSprintsWithTasks(
@@ -261,8 +248,6 @@ async getCallCenterSprints(
   ) {
     return this.projectsService.createSprintsWithTasks(projectId, sprintsDto);
   }
-
-
 
   @UseGuards(JwtAuthGuard)
   @Get('sprints/:sprintId')
@@ -292,7 +277,7 @@ async getCallCenterSprints(
   }
 
   // ============================================================
-  // TÂCHES
+  // TÂCHES IT
   // ============================================================
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -304,8 +289,6 @@ async getCallCenterSprints(
   ) {
     return this.projectsService.addTaskToSprint(sprintId, taskDto);
   }
-
- 
 
   @UseGuards(JwtAuthGuard)
   @Get('tasks/:taskId')
@@ -334,25 +317,22 @@ async getCallCenterSprints(
     return this.projectsService.deleteTask(taskId, req.user as UserEntity);
   }
 
+  @Get('developer/:developerId/delay-stats')
+  async getDeveloperDelayStats(@Param('developerId', ParseIntPipe) developerId: number) {
+    return this.projectsService.getDeveloperDelayStats(developerId);
+  }
 
-@Get('developer/:developerId/delay-stats')
-async getDeveloperDelayStats(
-  @Param('developerId', ParseIntPipe) developerId: number,
-) {
-  return this.projectsService.getDeveloperDelayStats(developerId);
-}
+  @Get('tasks/:taskId/delay-info')
+  async getTaskDelayInfo(@Param('taskId', ParseIntPipe) taskId: number) {
+    return this.projectsService.getTaskDelayInfo(taskId);
+  }
 
-@Get('tasks/:taskId/delay-info')
-async getTaskDelayInfo(@Param('taskId', ParseIntPipe) taskId: number) {
-  return this.projectsService.getTaskDelayInfo(taskId);
-}
+  @UseGuards(JwtAuthGuard)
+  @Get('tasks/:taskId/history')
+  async getTaskHistory(@Param('taskId', ParseIntPipe) taskId: number) {
+    return this.taskHistoryService.getTaskHistory(taskId);
+  }
 
-@UseGuards(JwtAuthGuard)
-@Roles(UserRole.PROJECT_MANAGER, UserRole.MANAGER, UserRole.MEMBER)
-@Get('tasks/:taskId/history')
-async getTaskHistory(@Param('taskId', ParseIntPipe) taskId: number) {
-  return this.taskHistoryService.getTaskHistory(taskId);
-}
   @UseGuards(JwtAuthGuard)
   @Patch('tasks/:taskId/status')
   async updateTaskStatus(
@@ -404,9 +384,7 @@ async getTaskHistory(@Param('taskId', ParseIntPipe) taskId: number) {
     return this.projectsService.deleteMarketingSprint(sprintId, req.user as UserEntity);
   }
 
-  // ─────────────────────────────────────────────────────────────────
   // 📊 MARKETING TASKS
-  // ─────────────────────────────────────────────────────────────────
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROJECT_MANAGER)
@@ -496,9 +474,7 @@ async getTaskHistory(@Param('taskId', ParseIntPipe) taskId: number) {
     return this.projectsService.deleteCallCenterSprint(sprintId, req.user as UserEntity);
   }
 
-  // ─────────────────────────────────────────────────────────────────
   // 📞 CALLCENTER TASKS
-  // ─────────────────────────────────────────────────────────────────
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROJECT_MANAGER)

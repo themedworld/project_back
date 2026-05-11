@@ -37,6 +37,7 @@ import { UpdateSprintCallCenterDto } from './dto/update-sprint-callcenter.dto';
 import { UpdateTaskCallCenterDto } from './dto/update-task-callcenter.dto';
 import { TaskMarketingStatus } from './entities/TaskMarketingEntity.entity';
 import { TaskCallCenterStatus } from './entities/TaskCallCenterEntity.entity';
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -60,7 +61,8 @@ export class ProjectsService {
 
     @InjectRepository(TaskITEntity)
     private taskITRepo: Repository<TaskITEntity>,
-     @InjectRepository(SprintMarketingEntity)
+
+    @InjectRepository(SprintMarketingEntity)
     private sprintMarketingRepo: Repository<SprintMarketingEntity>,
 
     @InjectRepository(TaskMarketingEntity)
@@ -72,184 +74,253 @@ export class ProjectsService {
     @InjectRepository(TaskCallCenterEntity)
     private taskCallCenterRepo: Repository<TaskCallCenterEntity>,
 
-
     private taskHistoryService: TaskHistoryService,
   ) {}
 
-
-async create(dto: CreateProjectDto, creator: UserEntity) {
-  // 1. Récupérer le créateur avec sa compagnie
-  const managerWithCompany = await this.userRepo.findOne({
-    where: { id: creator.id },
-    relations: ['company'],
-  });
-
-  if (!managerWithCompany || !managerWithCompany.company) {
-    throw new ForbiddenException("L'administrateur n'a pas de compagnie associée.");
-  }
-
-  const { projectManagerId, ...projectData } = dto;
-
-  // 2. Créer l'instance du projet
-  const project = this.projectRepo.create({
-    ...projectData,
-    createdBy: managerWithCompany, // On enregistre qui a créé
-    company: managerWithCompany.company,
-  });
-
-  // 3. Affecter le Project Manager si fourni
-  if (projectManagerId) {
-    const pm = await this.userRepo.findOne({
-      where: { 
-        id: projectManagerId, 
-        role: UserRole.PROJECT_MANAGER // Validation du rôle
-      }
+  async create(dto: CreateProjectDto, creator: UserEntity) {
+    const managerWithCompany = await this.userRepo.findOne({
+      where: { id: creator.id },
+      relations: ['company'],
     });
 
-    if (!pm) {
-      throw new NotFoundException(`Le Project Manager avec l'ID ${projectManagerId} n'existe pas.`);
+    if (!managerWithCompany || !managerWithCompany.company) {
+      throw new ForbiddenException("L'administrateur n'a pas de compagnie associée.");
     }
-    project.projectManager = pm;
-  }
 
-  return this.projectRepo.save(project);
-}
-// Ajoutez ceci dans ProjectsService
-async addMembersByProjectMember(
-  projectId: number,
-  memberIds: number[],
-  requester: UserEntity,
-) {
-  const project = await this.projectRepo.findOne({
-    where: { id: projectId },
-    relations: ['assignedTo', 'company', 'projectManager'],
-  });
+    const { projectManagerId, ...projectData } = dto;
 
-  if (!project) throw new NotFoundException('Project not found');
-
-  // Vérifier que le requester est bien membre du projet ou le PM
-  const isAssigned = (project.assignedTo || []).some(u => u.id === requester.id);
-  if (!isAssigned && project.projectManager?.id !== requester.id) {
-    throw new ForbiddenException('You are not a member of this project');
-  }
-
-  if (!project.company) throw new NotFoundException('Project company not found');
-
-  // Récupérer les utilisateurs valides (même company)
-  const members = await this.userRepo.find({
-    where: {
-      id: In(memberIds),
-      company: { id: project.company.id },
-    },
-  });
-
-  if (!members || members.length === 0) {
-    throw new NotFoundException('No valid members found to add');
-  }
-
-  // Fusionner sans doublons
-  const existing = project.assignedTo || [];
-  const existingIds = new Set(existing.map(u => u.id));
-  const toAdd = members.filter(m => !existingIds.has(m.id));
-
-  if (toAdd.length === 0) {
-    // Rien à ajouter
-    return { message: 'No new members to add', added: [] };
-  }
-
-  project.assignedTo = [...existing, ...toAdd];
-
-  const saved = await this.projectRepo.save(project);
-
-  // Retourner la liste des membres ajoutés pour plus de clarté
-  return {
-    message: 'Members added successfully',
-    added: toAdd.map(m => ({ id: m.id, email: m.email, fullname: m.fullname })),
-    projectId: saved.id,
-  };
-}
-// projects.service.ts (ajoutez la méthode suivante dans ProjectsService)
-
-async getProjectDetails(
-  projectId: number,
-  options?: { memberSearch?: string; includeDomainDetails?: boolean },
-) {
-  const includeDomain = options?.includeDomainDetails ?? true;
-  // Charger le projet avec les relations de base
-  const project = await this.projectRepo.findOne({
-    where: { id: projectId },
-    relations: ['createdBy', 'projectManager', 'assignedTo', 'company', 'itDetails', 'marketingDetails', 'callCenterDetails'],
-  });
-
-  if (!project) throw new NotFoundException('Project not found');
-
-  // Filtrer les membres en mémoire si memberSearch est fourni
-  let filteredMembers = project.assignedTo || [];
-  if (options?.memberSearch && options.memberSearch.trim().length > 0) {
-    const q = options.memberSearch.trim().toLowerCase();
-    filteredMembers = filteredMembers.filter(u => {
-      const name = (u.fullname || '').toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      return name.includes(q) || email.includes(q);
+    const project = this.projectRepo.create({
+      ...projectData,
+      createdBy: managerWithCompany,
+      company: managerWithCompany.company,
     });
+
+    if (projectManagerId) {
+      const pm = await this.userRepo.findOne({
+        where: { id: projectManagerId, role: UserRole.PROJECT_MANAGER },
+      });
+      if (!pm) {
+        throw new NotFoundException(`Le Project Manager avec l'ID ${projectManagerId} n'existe pas.`);
+      }
+      project.projectManager = pm;
+    }
+
+    return this.projectRepo.save(project);
   }
 
-  // Préparer les détails selon le domaine
- let domainDetails:
-    | ProjectITEntity
-    | ProjectMarketingEntity
-    | ProjectCallCenterEntity
-    | null = null;
+  async addMembersByProjectMember(
+    projectId: number,
+    memberIds: number[],
+    requester: UserEntity,
+  ) {
+    const project = await this.projectRepo.findOne({
+      where: { id: projectId },
+      relations: ['assignedTo', 'company', 'projectManager'],
+    });
 
-  if (includeDomain) {
+    if (!project) throw new NotFoundException('Project not found');
+
+    const isAssigned = (project.assignedTo || []).some(u => u.id === requester.id);
+    if (!isAssigned && project.projectManager?.id !== requester.id) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+
+    if (!project.company) throw new NotFoundException('Project company not found');
+
+    const members = await this.userRepo.find({
+      where: { id: In(memberIds), company: { id: project.company.id } },
+    });
+
+    if (!members || members.length === 0) {
+      throw new NotFoundException('No valid members found to add');
+    }
+
+    const existing = project.assignedTo || [];
+    const existingIds = new Set(existing.map(u => u.id));
+    const toAdd = members.filter(m => !existingIds.has(m.id));
+
+    if (toAdd.length === 0) {
+      return { message: 'No new members to add', added: [] };
+    }
+
+    project.assignedTo = [...existing, ...toAdd];
+    const saved = await this.projectRepo.save(project);
+
+    return {
+      message: 'Members added successfully',
+      added: toAdd.map(m => ({ id: m.id, email: m.email, fullname: m.fullname })),
+      projectId: saved.id,
+    };
+  }
+
+  async getProjectDetails(
+    projectId: number,
+    options?: { memberSearch?: string; includeDomainDetails?: boolean },
+  ) {
+    const includeDomain = options?.includeDomainDetails ?? true;
+
+    const project = await this.projectRepo.findOne({
+      where: { id: projectId },
+      relations: [
+        'createdBy', 'projectManager', 'assignedTo', 'company',
+        'itDetails', 'marketingDetails', 'callCenterDetails',
+      ],
+    });
+
+    if (!project) throw new NotFoundException('Project not found');
+
+    let filteredMembers = project.assignedTo || [];
+    if (options?.memberSearch && options.memberSearch.trim().length > 0) {
+      const q = options.memberSearch.trim().toLowerCase();
+      filteredMembers = filteredMembers.filter(u => {
+        const name = (u.fullname || '').toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        return name.includes(q) || email.includes(q);
+      });
+    }
+
+    let domainDetails:
+      | ProjectITEntity
+      | ProjectMarketingEntity
+      | ProjectCallCenterEntity
+      | null = null;
+
+    if (includeDomain) {
+      switch (project.domain) {
+        case 'IT':
+          domainDetails = project.itDetails ?? null;
+          break;
+        case 'Marketing':
+          domainDetails = project.marketingDetails ?? null;
+          break;
+        case 'CallCenter':
+          domainDetails = project.callCenterDetails ?? null;
+          break;
+        default:
+          domainDetails = null;
+      }
+    }
+
+    return {
+      project: {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        status: project.status,
+        domain: project.domain,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        company: project.company ? { id: project.company.id, name: project.company.name } : null,
+        createdBy: project.createdBy
+          ? { id: project.createdBy.id, name: project.createdBy.fullname, email: project.createdBy.email }
+          : null,
+        projectManager: project.projectManager
+          ? { id: project.projectManager.id, fullname: project.projectManager.fullname, email: project.projectManager.email }
+          : null,
+        assignedTo: filteredMembers.map(u => ({ id: u.id, name: u.fullname, email: u.email })),
+        isActive: project.isActive,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+      },
+      domainDetails,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // ✅ UPSERT domain details — reçoit directement le projectId
+  //    → cherche l'enregistrement existant par project.id
+  //    → met à jour si trouvé, crée sinon
+  // ─────────────────────────────────────────────────────────────────
+
+  async upsertCallCenterDetails(projectId: number, dto: CreateProjectCallCenterDto) {
+    // 1. Charger le projet (nécessaire pour la relation FK)
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    // 2. Chercher l'enregistrement existant par project.id (pas par l'id de la fiche)
+    const existing = await this.projectCallCenterRepo.findOne({
+      where: { project: { id: projectId } },
+    });
+
+    if (existing) {
+      // UPDATE — ne mettre à jour que les champs envoyés (non-undefined)
+      Object.assign(existing, dto);
+      return this.projectCallCenterRepo.save(existing);
+    }
+
+    // INSERT — première fois
+    const details = this.projectCallCenterRepo.create({ ...dto, project });
+    return this.projectCallCenterRepo.save(details);
+  }
+
+  async upsertITDetails(projectId: number, dto: ProjectITDto) {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const existing = await this.projectITRepo.findOne({
+      where: { project: { id: projectId } },
+    });
+
+    if (existing) {
+      Object.assign(existing, dto);
+      return this.projectITRepo.save(existing);
+    }
+
+    const details = this.projectITRepo.create({ ...dto, project });
+    return this.projectITRepo.save(details);
+  }
+
+  async upsertMarketingDetails(projectId: number, dto: CreateProjectMarketingDto) {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const existing = await this.projectMarketingRepo.findOne({
+      where: { project: { id: projectId } },
+    });
+
+    if (existing) {
+      Object.assign(existing, dto);
+      return this.projectMarketingRepo.save(existing);
+    }
+
+    const details = this.projectMarketingRepo.create({ ...dto, project });
+    return this.projectMarketingRepo.save(details);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // Anciennes méthodes gardées pour init-domain (compatibilité)
+  // ─────────────────────────────────────────────────────────────────
+
+  async addITDetails(project: ProjectEntity, dto: ProjectITDto) {
+    return this.upsertITDetails(project.id, dto);
+  }
+
+  async addMarketingDetails(project: ProjectEntity, dto: CreateProjectMarketingDto) {
+    return this.upsertMarketingDetails(project.id, dto);
+  }
+
+  async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterDto) {
+    return this.upsertCallCenterDetails(project.id, dto);
+  }
+
+  async initializeDomainDetails(project: ProjectEntity, dto: any) {
     switch (project.domain) {
       case 'IT':
-        domainDetails = project.itDetails ?? null;
-        break;
+        return this.upsertITDetails(project.id, dto as ProjectITDto);
       case 'Marketing':
-        domainDetails = project.marketingDetails ?? null;
-        break;
+        return this.upsertMarketingDetails(project.id, dto as CreateProjectMarketingDto);
       case 'CallCenter':
-        domainDetails = project.callCenterDetails ?? null;
-        break;
+        return this.upsertCallCenterDetails(project.id, dto as CreateProjectCallCenterDto);
       default:
-        domainDetails = null;
+        return null;
     }
   }
 
-  // Retour structuré
-  return {
-    project: {
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      status: project.status,
-      domain: project.domain,
-      startDate: project.startDate,
-      endDate: project.endDate,
-      company: project.company ? { id: project.company.id, name: project.company.name } : null,
-      createdBy: project.createdBy ? { id: project.createdBy.id, name: project.createdBy.fullname, email: project.createdBy.email } : null,
-      projectManager: project.projectManager ? { id: project.projectManager.id, name: project.projectManager.fullname, email: project.projectManager.email } : null,
-      assignedTo: filteredMembers.map(u => ({ id: u.id, name: u.fullname, email: u.email })),
-      isActive: project.isActive,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-    },
-    domainDetails,
-  };
-}
-
-  // 🔹 Manager affecte un Project Manager
-  async assignProjectManager(
-    projectId: number,
-    pmId: number,
-    manager: UserEntity,
-  ) {
+  async assignProjectManager(projectId: number, pmId: number, manager: UserEntity) {
     const project = await this.projectRepo.findOne({
       where: { id: projectId },
       relations: ['company', 'manager'],
     });
-
     if (!project) throw new NotFoundException('Project not found');
 
     if (!manager || !manager.company || project.company.id !== manager.company.id) {
@@ -260,9 +331,7 @@ async getProjectDetails(
       where: { id: pmId, role: UserRole.PROJECT_MANAGER },
       relations: ['company'],
     });
-
     if (!pm) throw new NotFoundException('Project Manager not found');
-
     if (!pm.company || pm.company.id !== manager.company.id) {
       throw new ForbiddenException('PM belongs to a different company');
     }
@@ -271,115 +340,72 @@ async getProjectDetails(
     return this.projectRepo.save(project);
   }
 
-  // 🔹 Project Manager ajoute des membres
-  async addMembers(
-    projectId: number,
-    memberIds: number[],
-    projectManager: UserEntity,
-  ) {
+  async addMembers(projectId: number, memberIds: number[], projectManager: UserEntity) {
     const project = await this.projectRepo.findOne({
       where: { id: projectId },
       relations: ['assignedTo', 'company', 'projectManager', 'createdBy'],
     });
-
     if (!project) throw new NotFoundException('Project not found');
-
     if (project.projectManager?.id !== projectManager.id) {
       throw new ForbiddenException('You are not the Project Manager of this project');
     }
-
     if (!project.company) throw new NotFoundException('Project company not found');
 
     const members = await this.userRepo.find({
-      where: {
-        id: In(memberIds),
-        company: { id: project.company.id },
-      },
+      where: { id: In(memberIds), company: { id: project.company.id } },
     });
 
     project.assignedTo = [...(project.assignedTo || []), ...members];
-
     return this.projectRepo.save(project);
   }
 
-  // 🔹 Voir tous les projets
-async findAll(user: UserEntity) {
-  const relations = ['createdBy', 'projectManager', 'assignedTo', 'company'];
+  async findAll(user: UserEntity) {
+    const relations = ['createdBy', 'projectManager', 'assignedTo', 'company'];
 
-  if (user.role === UserRole.SUPER_ADMIN) {
-    return this.projectRepo.find({ relations });
+    if (user.role === UserRole.SUPER_ADMIN) {
+      return this.projectRepo.find({ relations });
+    }
+    if (!user.companyId) return [];
+
+    if (user.role === UserRole.ADMIN_COMPANY) {
+      return this.projectRepo.find({
+        where: { company: { id: user.companyId as number } },
+        relations,
+      });
+    }
+    if (user.role === UserRole.MANAGER) {
+      return this.projectRepo.find({ where: { createdBy: { id: user.id } }, relations });
+    }
+    if (user.role === UserRole.PROJECT_MANAGER) {
+      return this.projectRepo.find({ where: { projectManager: { id: user.id } }, relations });
+    }
+    return this.projectRepo.find({ where: { assignedTo: { id: user.id } }, relations });
   }
 
-  // Vérification de sécurité pour le companyId
-  if (!user.companyId) {
-    // Si l'utilisateur n'a pas de compagnie (et n'est pas super_admin), 
-    // il ne peut voir aucun projet de compagnie.
-    return []; 
-  }
-
-  if (user.role === UserRole.ADMIN_COMPANY) {
-    return this.projectRepo.find({
-      // On force le type ou on s'assure qu'il n'est pas nul ici
-      where: { company: { id: user.companyId as number } },
-      relations,
-    });
-  }
-
-  if (user.role === UserRole.MANAGER) {
-    return this.projectRepo.find({
-      where: { createdBy: { id: user.id } },
-      relations,
-    });
-  }
-
-  if (user.role === UserRole.PROJECT_MANAGER) {
-    return this.projectRepo.find({
-      where: { projectManager: { id: user.id } },
-      relations,
-    });
-  }
-
-  // Pour les membres/agents
-  return this.projectRepo.find({
-    where: { assignedTo: { id: user.id } },
-    relations,
-  });
-}
-  // 🔹 Voir un projet
   async findOne(id: number) {
     const project = await this.projectRepo.findOne({
       where: { id },
-      relations: ['createdBy','projectManager','assignedTo','company'],
+      relations: ['createdBy', 'projectManager', 'assignedTo', 'company'],
     });
-
     if (!project) throw new NotFoundException('Project not found');
-
     return project;
   }
 
-    // 🔹 Mettre à jour projet
   async update(id: number, dto: UpdateProjectDto) {
-    const project = await this.projectRepo.findOne({ 
+    const project = await this.projectRepo.findOne({
       where: { id },
-      relations: ['projectManager', 'company'], // 👈 Charger les relations
+      relations: ['projectManager', 'company'],
     });
-
     if (!project) throw new NotFoundException('Project not found');
 
-    // ✅ Traiter projectManagerId spécialement
     if (dto.projectManagerId !== undefined) {
       if (dto.projectManagerId && dto.projectManagerId !== null) {
         const pm = await this.userRepo.findOne({
-          where: { 
-            id: dto.projectManagerId, 
-            role: UserRole.PROJECT_MANAGER 
-          }
+          where: { id: dto.projectManagerId, role: UserRole.PROJECT_MANAGER },
         });
         if (!pm) throw new NotFoundException(`Project Manager not found`);
         project.projectManager = pm;
       }
-      
-      // Enlever projectManagerId du DTO pour éviter les doublons
       const { projectManagerId, ...rest } = dto;
       Object.assign(project, rest);
     } else {
@@ -388,78 +414,32 @@ async findAll(user: UserEntity) {
 
     return this.projectRepo.save(project);
   }
-// Ajouter après getSprintsOfProjectIT()
 
-async getMarketingSprintsOfProject(projectId: number): Promise<SprintMarketingEntity[]> {
-  const project = await this.projectMarketingRepo.findOne({
-    where: { id: projectId },
-    relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
-  });
-  if (!project) throw new NotFoundException('Marketing Project not found');
-  return project.sprints ?? [];
-}
+  async getMarketingSprintsOfProject(projectId: number): Promise<SprintMarketingEntity[]> {
+    const project = await this.projectMarketingRepo.findOne({
+      where: { id: projectId },
+      relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
+    });
+    if (!project) throw new NotFoundException('Marketing Project not found');
+    return project.sprints ?? [];
+  }
 
-async getCallCenterSprintsOfProject(projectId: number): Promise<SprintCallCenterEntity[]> {
-  const project = await this.projectCallCenterRepo.findOne({
-    where: { id: projectId },
-    relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
-  });
-  if (!project) throw new NotFoundException('CallCenter Project not found');
-  return project.sprints ?? [];
-}
-  // 🔹 Supprimer projet
+  async getCallCenterSprintsOfProject(projectId: number): Promise<SprintCallCenterEntity[]> {
+    const project = await this.projectCallCenterRepo.findOne({
+      where: { id: projectId },
+      relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
+    });
+    if (!project) throw new NotFoundException('CallCenter Project not found');
+    return project.sprints ?? [];
+  }
+
   async remove(id: number) {
     const project = await this.projectRepo.findOne({ where: { id } });
     if (!project) throw new NotFoundException('Project not found');
-
     await this.projectRepo.remove(project);
     return { message: 'Project removed successfully' };
   }
 
-  async addITDetails(project: ProjectEntity, dto: ProjectITDto) {
-    const itDetails = this.projectITRepo.create({ ...dto, project });
-    return this.projectITRepo.save(itDetails);
-  }
-
-  // 🔹 Créer les détails Marketing
-  async addMarketingDetails(project: ProjectEntity, dto: CreateProjectMarketingDto) {
-    const marketingDetails = this.projectMarketingRepo.create({ ...dto, project });
-    return this.projectMarketingRepo.save(marketingDetails);
-  }
-
-  // 🔹 Créer les détails CallCenter
-async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterDto) {
-  // Chercher si un enregistrement existe déjà pour ce projet
-  const existing = await this.projectCallCenterRepo.findOne({
-    where: { project: { id: project.id } },
-  });
-
-  if (existing) {
-    // UPDATE — fusionner les champs non-null du dto
-    Object.assign(existing, dto);
-    return this.projectCallCenterRepo.save(existing);
-  }
-
-  // INSERT — première fois
-  const callCenterDetails = this.projectCallCenterRepo.create({ ...dto, project });
-  return this.projectCallCenterRepo.save(callCenterDetails);
-}
-
-  // 🔹 Initialiser automatiquement selon le domaine
-  async initializeDomainDetails(project: ProjectEntity, dto: any) {
-    switch (project.domain) {
-      case 'IT':
-        return this.addITDetails(project, dto as ProjectITDto);
-      case 'Marketing':
-        return this.addMarketingDetails(project, dto as CreateProjectMarketingDto);
-      case 'CallCenter':
-        return this.addCallCenterDetails(project, dto as CreateProjectCallCenterDto);
-      default:
-        return null; // pour "Other", pas de détails spécifiques
-    }
-  }
-
-  // 🔹 Récupérer les sprints d'un project IT (exposé via service)
   async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     const projectIT = await this.projectITRepo.findOne({
       where: { id: projectId },
@@ -469,7 +449,6 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
     return projectIT.sprints;
   }
 
-  // 🔹 Récupérer les tâches d'un sprint (exposé via service)
   async getTasksOfSprint(sprintId: number): Promise<TaskITEntity[]> {
     const sprint = await this.sprintITRepo.findOne({
       where: { id: sprintId },
@@ -483,14 +462,12 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
     projectId: number,
     sprintsDto: CreateSprintITDto[],
   ): Promise<SprintITEntity[]> {
-    // Récupérer le projet IT
     const projectIT = await this.projectITRepo.findOne({ where: { id: projectId } });
     if (!projectIT) throw new NotFoundException('Project IT not found');
 
     const createdSprints: SprintITEntity[] = [];
 
     for (const sprintDto of sprintsDto) {
-      // Créer le sprint
       const sprint = this.sprintITRepo.create({
         name: sprintDto.name,
         startDate: new Date(sprintDto.startDate),
@@ -508,7 +485,6 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
 
       const savedSprint = await this.sprintITRepo.save(sprint);
 
-      // Créer les tâches pour ce sprint
       if (sprintDto.tasks && sprintDto.tasks.length > 0) {
         for (const taskDto of sprintDto.tasks) {
           const task = this.taskITRepo.create({
@@ -525,12 +501,9 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
             additionalNotes: taskDto.additionalNotes,
             sprint: savedSprint,
           });
-
-          // Optionnel : assigner un utilisateur si assignedToId est fourni
           if (taskDto.assignedToId) {
             task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
           }
-
           await this.taskITRepo.save(task);
         }
       }
@@ -541,18 +514,13 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
     return createdSprints;
   }
 
-  async addTaskToSprint(
-    sprintId: number,
-    taskDto: CreateTaskITDto,
-  ): Promise<TaskITEntity> {
-    // 1️⃣ Récupérer le sprint
+  async addTaskToSprint(sprintId: number, taskDto: CreateTaskITDto): Promise<TaskITEntity> {
     const sprint = await this.sprintITRepo.findOne({
       where: { id: sprintId },
       relations: ['tasks'],
     });
     if (!sprint) throw new NotFoundException('Sprint IT not found');
 
-    // 2️⃣ Créer la tâche et l'associer au sprint
     const task = this.taskITRepo.create({
       title: taskDto.title,
       description: taskDto.description,
@@ -568,31 +536,24 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
       sprint: sprint,
     });
 
-    // 3️⃣ Optionnel : assigner un utilisateur si provided
     if (taskDto.assignedToId) {
       task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
     }
 
-    // 4️⃣ Sauvegarder la tâche
-    const savedTask = await this.taskITRepo.save(task);
-
-    return savedTask;
+    return this.taskITRepo.save(task);
   }
 
   async assignTaskToMember(
-    taskId: number,          // ID de la tâche à assigner
-    memberId: number,        // ID du membre à qui assigner
-    projectManager: UserEntity, // Le Project Manager qui effectue l'action
+    taskId: number,
+    memberId: number,
+    projectManager: UserEntity,
   ): Promise<TaskITEntity> {
-    // 1️⃣ Récupérer la tâche avec le sprint et le projet IT
     const task = await this.taskITRepo.findOne({
       where: { id: taskId },
       relations: ['sprint', 'sprint.projectIT', 'sprint.projectIT.project'],
     });
-
     if (!task) throw new NotFoundException('Task not found');
 
-    // 2���⃣ Vérifier que le Project Manager gère bien le projet
     const projectIT = task.sprint.projectIT;
     if (!projectIT || !projectIT.project) {
       throw new NotFoundException('Project IT or parent project not found');
@@ -602,203 +563,156 @@ async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterD
       where: { id: projectIT.project.id },
       relations: ['manager', 'manager.company'],
     });
-
     if (!project) throw new NotFoundException('Project not found');
-
     if (project.projectManager?.id !== projectManager.id) {
       throw new ForbiddenException('You are not the Project Manager of this project');
     }
-
-    // 3️⃣ Vérifier que le membre appartient à la même entreprise
-    if ( !project.company) {
+    if (!project.company) {
       throw new NotFoundException('Project manager or company not configured for this project');
     }
 
-    const companyId = project.company.id;
-
     const member = await this.userRepo.findOne({
-      where: { id: memberId, company: { id: companyId } },
+      where: { id: memberId, company: { id: project.company.id } },
     });
-
     if (!member) throw new NotFoundException('Member not found in your company');
 
-    // 4️⃣ Assigner le membre à la tâche
     task.assignedTo = member;
-
-    // 5️⃣ Sauvegarder et retourner la tâche
     return this.taskITRepo.save(task);
   }
 
   async assignProjectToPM(
-    projectId: number,       // ID du projet à affecter
-    pmId: number,            // ID du Project Manager
-    manager: UserEntity,     // Le manager qui effectue l'action
+    projectId: number,
+    pmId: number,
+    manager: UserEntity,
   ): Promise<ProjectEntity> {
-    // 1️⃣ Récupérer le projet avec son manager actuel et la société
     const project = await this.projectRepo.findOne({
       where: { id: projectId },
       relations: ['company', 'manager'],
     });
-
     if (!project) throw new NotFoundException('Project not found');
-
-    // 2️⃣ Vérifier que le manager courant appartient à la même société
     if (!manager || !manager.company || project.company.id !== manager.company.id) {
       throw new ForbiddenException('You cannot assign a PM to a project from another company');
     }
 
-    // 3️⃣ Vérifier que le Project Manager existe et appartient à la même société
     const pm = await this.userRepo.findOne({
       where: { id: pmId, role: UserRole.PROJECT_MANAGER },
       relations: ['company'],
     });
-
     if (!pm) throw new NotFoundException('Project Manager not found');
-
     if (!pm.company || pm.company.id !== manager.company.id) {
       throw new ForbiddenException('The PM belongs to a different company');
     }
 
-    // 4️⃣ Affecter le Project Manager au projet
     project.projectManager = pm;
-
-    // 5️⃣ Sauvegarder et retourner le projet mis à jour
     return this.projectRepo.save(project);
   }
+
   async getSprintById(sprintId: number): Promise<SprintITEntity> {
-  const sprint = await this.sprintITRepo.findOne({   // ← sprintITRepo
-    where: { id: sprintId },
-    relations: ['tasks', 'tasks.assignedTo'],
-  });
-  if (!sprint) throw new NotFoundException(`Sprint #${sprintId} introuvable`);
-  return sprint;
-}
-
-async updateSprint(sprintId: number, dto: UpdateSprintITDto, user: UserEntity): Promise<SprintITEntity> {
-  const sprint = await this.getSprintById(sprintId);
-  Object.assign(sprint, dto);
-  return this.sprintITRepo.save(sprint);             // ← sprintITRepo
-}
-
-async deleteSprint(sprintId: number, user: UserEntity): Promise<{ message: string }> {
-  const sprint = await this.getSprintById(sprintId);
-  await this.sprintITRepo.remove(sprint);            // ← sprintITRepo
-  return { message: `Sprint #${sprintId} supprimé avec succès` };
-}
-
-// ── TÂCHES ───────────────────────────────────────────────
-
-async getTaskById(taskId: number): Promise<TaskITEntity> {
-  const task = await this.taskITRepo.findOne({       // ← taskITRepo
-    where: { id: taskId },
-    relations: ['assignedTo', 'sprint'],
-  });
-  if (!task) throw new NotFoundException(`Tâche #${taskId} introuvable`);
-  return task;
-}
-
-
-
-async deleteTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
-  const task = await this.getTaskById(taskId);
-  await this.taskITRepo.remove(task);                // ← taskITRepo
-  return { message: `Tâche #${taskId} supprimée avec succès` };
-}
-
- async updateTaskStatus(
-  taskId: number,
-  status: string,
-  user: UserEntity,
-): Promise<TaskITEntity> {
-  const task = await this.getTaskById(taskId);
-  task.status = status as TaskStatus;
-
-  // ✅ Enregistrer l'historique AVEC LE DOMAINE
-  await this.taskHistoryService.recordTaskStatusChange(
-    task.id,
-    status,
-    'IT', // ← Spécifier le domaine
-  );
-
-  return this.taskITRepo.save(task);
-}
-
-async updateTask(
-  taskId: number,
-  dto: UpdateTaskITDto,
-  user: UserEntity,
-): Promise<TaskITEntity> {
-  const task = await this.getTaskById(taskId);
-  const { assignedTo, ...rest } = dto as any;
-  const previousStatus = task.status;
-
-  Object.assign(task, rest);
-
-  if (assignedTo?.id) {
-    const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
-    if (!member) throw new NotFoundException(`Membre #${assignedTo.id} introuvable`);
-    task.assignedTo = member;
+    const sprint = await this.sprintITRepo.findOne({
+      where: { id: sprintId },
+      relations: ['tasks', 'tasks.assignedTo'],
+    });
+    if (!sprint) throw new NotFoundException(`Sprint #${sprintId} introuvable`);
+    return sprint;
   }
 
-  // ✅ Enregistrer l'historique si le statut change
-  if (dto.status && dto.status !== previousStatus) {
-    await this.taskHistoryService.recordTaskStatusChange(
-      task.id,
-      dto.status as string,
-      'IT',
-    );
+  async updateSprint(sprintId: number, dto: UpdateSprintITDto, user: UserEntity): Promise<SprintITEntity> {
+    const sprint = await this.getSprintById(sprintId);
+    Object.assign(sprint, dto);
+    return this.sprintITRepo.save(sprint);
   }
 
-  if (dto.status === 'DONE' && !task.actualEndDate) {
-    task.actualEndDate = new Date();
-    if (task.scheduledEndDate) {
-      const delayMs = task.actualEndDate.getTime() - task.scheduledEndDate.getTime();
-      task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+  async deleteSprint(sprintId: number, user: UserEntity): Promise<{ message: string }> {
+    const sprint = await this.getSprintById(sprintId);
+    await this.sprintITRepo.remove(sprint);
+    return { message: `Sprint #${sprintId} supprimé avec succès` };
+  }
+
+  async getTaskById(taskId: number): Promise<TaskITEntity> {
+    const task = await this.taskITRepo.findOne({
+      where: { id: taskId },
+      relations: ['assignedTo', 'sprint'],
+    });
+    if (!task) throw new NotFoundException(`Tâche #${taskId} introuvable`);
+    return task;
+  }
+
+  async deleteTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
+    const task = await this.getTaskById(taskId);
+    await this.taskITRepo.remove(task);
+    return { message: `Tâche #${taskId} supprimée avec succès` };
+  }
+
+  async updateTaskStatus(taskId: number, status: string, user: UserEntity): Promise<TaskITEntity> {
+    const task = await this.getTaskById(taskId);
+    task.status = status as TaskStatus;
+    await this.taskHistoryService.recordTaskStatusChange(task.id, status, 'IT');
+    return this.taskITRepo.save(task);
+  }
+
+  async updateTask(taskId: number, dto: UpdateTaskITDto, user: UserEntity): Promise<TaskITEntity> {
+    const task = await this.getTaskById(taskId);
+    const { assignedTo, ...rest } = dto as any;
+    const previousStatus = task.status;
+
+    Object.assign(task, rest);
+
+    if (assignedTo?.id) {
+      const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+      if (!member) throw new NotFoundException(`Membre #${assignedTo.id} introuvable`);
+      task.assignedTo = member;
     }
+
+    if (dto.status && dto.status !== previousStatus) {
+      await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'IT');
+    }
+
+    if (dto.status === 'DONE' && !task.actualEndDate) {
+      task.actualEndDate = new Date();
+      if (task.scheduledEndDate) {
+        const delayMs = task.actualEndDate.getTime() - task.scheduledEndDate.getTime();
+        task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+      }
+    }
+
+    return this.taskITRepo.save(task);
   }
 
-  return this.taskITRepo.save(task);
-}
+  async getDeveloperDelayStats(developerId: number) {
+    const tasks = await this.taskITRepo.find({
+      where: { assignedTo: { id: developerId }, status: TaskStatus.DONE },
+    });
 
-async getDeveloperDelayStats(developerId: number) {
-  // Récupérer toutes les tâches complétées du développeur
-  const tasks = await this.taskITRepo.find({
-    where: { 
-      assignedTo: { id: developerId }, 
-      status: TaskStatus.DONE, // ✅ Utiliser l'enum
-    },
-  });
+    const totalDelay = tasks.reduce((sum, t) => sum + (t.delayHours || 0), 0);
+    const onTimeCount = tasks.filter(t => (t.delayHours || 0) <= 0).length;
 
-  const totalDelay = tasks.reduce((sum, t) => sum + (t.delayHours || 0), 0);
-  const onTimeCount = tasks.filter(t => (t.delayHours || 0) <= 0).length;
+    return {
+      developerId,
+      totalTasks: tasks.length,
+      onTimeCount,
+      lateCount: tasks.length - onTimeCount,
+      totalDelayHours: totalDelay,
+      averageDelay: tasks.length > 0 ? Math.round((totalDelay / tasks.length) * 100) / 100 : 0,
+      isPerforming: tasks.length > 0 && onTimeCount / tasks.length >= 0.8,
+    };
+  }
 
-  return {
-    developerId,
-    totalTasks: tasks.length,
-    onTimeCount,
-    lateCount: tasks.length - onTimeCount,
-    totalDelayHours: totalDelay,
-    averageDelay: tasks.length > 0 ? Math.round((totalDelay / tasks.length) * 100) / 100 : 0,
-    isPerforming: tasks.length > 0 && (onTimeCount / tasks.length) >= 0.8, // 80% à temps
-  };
-}
+  async getTaskDelayInfo(taskId: number) {
+    const task = await this.getTaskById(taskId);
+    return {
+      taskId: task.id,
+      title: task.title,
+      scheduledEnd: task.scheduledEndDate,
+      actualEnd: task.actualEndDate,
+      delayHours: task.delayHours || 0,
+      status: !task.actualEndDate
+        ? '⏳ Non complété'
+        : (task.delayHours || 0) > 0
+          ? `⚠️ En retard de ${task.delayHours}h`
+          : `✅ Avance de ${Math.abs(task.delayHours || 0)}h`,
+    };
+  }
 
-async getTaskDelayInfo(taskId: number) {
-  const task = await this.getTaskById(taskId);
-  
-  return {
-    taskId: task.id,
-    title: task.title,
-    scheduledEnd: task.scheduledEndDate,
-    actualEnd: task.actualEndDate,
-    delayHours: task.delayHours || 0,
-    status: !task.actualEndDate 
-      ? '⏳ Non complété' 
-      : (task.delayHours || 0) > 0 
-        ? `⚠️ En retard de ${task.delayHours}h` 
-        : `✅ Avance de ${Math.abs(task.delayHours || 0)}h`,
-  };
-}
   // ════════════════════════════════════════════════════════════════════
   // 📊 MARKETING SPRINTS & TASKS
   // ════════════════════════════════════════════════════════════════════
@@ -807,9 +721,7 @@ async getTaskDelayInfo(taskId: number) {
     projectId: number,
     sprintsDto: CreateSprintMarketingDto[],
   ): Promise<SprintMarketingEntity[]> {
-    const project = await this.projectMarketingRepo.findOne({
-      where: { id: projectId },
-    });
+    const project = await this.projectMarketingRepo.findOne({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Marketing Project not found');
 
     const createdSprints: SprintMarketingEntity[] = [];
@@ -817,8 +729,8 @@ async getTaskDelayInfo(taskId: number) {
     for (const sprintDto of sprintsDto) {
       const sprint = this.sprintMarketingRepo.create({
         name: sprintDto.name,
-startDate: new Date(sprintDto.startDate ?? new Date()),
-endDate: new Date(sprintDto.endDate ?? new Date()),
+        startDate: new Date(sprintDto.startDate ?? new Date()),
+        endDate: new Date(sprintDto.endDate ?? new Date()),
         status: 'planned',
         totalBudget: sprintDto.totalBudget,
         campaignType: sprintDto.campaignType,
@@ -833,33 +745,30 @@ endDate: new Date(sprintDto.endDate ?? new Date()),
 
       const savedSprint = await this.sprintMarketingRepo.save(sprint);
 
-    if (sprintDto.tasks && sprintDto.tasks.length > 0) {
-  for (const taskDto of sprintDto.tasks) {
-    // ✅ Créer directement sans .create()
-   const task = new TaskMarketingEntity();
-task.title = taskDto.title;
-task.description        = taskDto.description        ?? '';
-task.type = taskDto.type as any ?? '';
-task.status = (taskDto.status || 'TO_DO') as any;
-task.priority = taskDto.priority as any ?? '';
-task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
-task.budget             = taskDto.budget             ?? 0;
-task.expectedViews      = taskDto.expectedViews      ?? 0;
-task.expectedClicks     = taskDto.expectedClicks     ?? 0;
-task.expectedLeads      = taskDto.expectedLeads      ?? 0;
-task.expectedConversions = taskDto.expectedConversions ?? 0;
-task.expectedCTR = taskDto.expectedCTR as any ?? 0;
-task.channel            = taskDto.channel            ?? '';
-task.scheduledEndDate   = taskDto.scheduledEndDate   ?? new Date();
-task.sprint = savedSprint;
-
-    if (taskDto.assignedToId) {
-      task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
-    }
-
-    await this.taskMarketingRepo.save(task);
-  }
-}
+      if (sprintDto.tasks && sprintDto.tasks.length > 0) {
+        for (const taskDto of sprintDto.tasks) {
+          const task = new TaskMarketingEntity();
+          task.title = taskDto.title;
+          task.description = taskDto.description ?? '';
+          task.type = taskDto.type as any ?? '';
+          task.status = (taskDto.status || 'TO_DO') as any;
+          task.priority = taskDto.priority as any ?? '';
+          task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
+          task.budget = taskDto.budget ?? 0;
+          task.expectedViews = taskDto.expectedViews ?? 0;
+          task.expectedClicks = taskDto.expectedClicks ?? 0;
+          task.expectedLeads = taskDto.expectedLeads ?? 0;
+          task.expectedConversions = taskDto.expectedConversions ?? 0;
+          task.expectedCTR = taskDto.expectedCTR as any ?? 0;
+          task.channel = taskDto.channel ?? '';
+          task.scheduledEndDate = taskDto.scheduledEndDate ?? new Date();
+          task.sprint = savedSprint;
+          if (taskDto.assignedToId) {
+            task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+          }
+          await this.taskMarketingRepo.save(task);
+        }
+      }
 
       createdSprints.push(savedSprint);
     }
@@ -867,39 +776,36 @@ task.sprint = savedSprint;
     return createdSprints;
   }
 
- async addTaskToMarketingSprint(
-  sprintId: number,
-  taskDto: CreateTaskMarketingDto,
-): Promise<TaskMarketingEntity> {
-  const sprint = await this.sprintMarketingRepo.findOne({
-    where: { id: sprintId },
-  });
-  if (!sprint) throw new NotFoundException('Marketing Sprint not found');
+  async addTaskToMarketingSprint(
+    sprintId: number,
+    taskDto: CreateTaskMarketingDto,
+  ): Promise<TaskMarketingEntity> {
+    const sprint = await this.sprintMarketingRepo.findOne({ where: { id: sprintId } });
+    if (!sprint) throw new NotFoundException('Marketing Sprint not found');
 
-  // ✅ Créer directement sans déstructuration problématique
-  const task = new TaskMarketingEntity();
-task.title = taskDto.title;
-task.description        = taskDto.description        ?? '';
-task.type = taskDto.type as any ?? '';
-task.status = (taskDto.status || 'TO_DO') as any;
-task.priority = taskDto.priority as any ?? '';
-task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
-task.budget             = taskDto.budget             ?? 0;
-task.expectedViews      = taskDto.expectedViews      ?? 0;
-task.expectedClicks     = taskDto.expectedClicks     ?? 0;
-task.expectedLeads      = taskDto.expectedLeads      ?? 0;
-task.expectedConversions = taskDto.expectedConversions ?? 0;
-task.expectedCTR = taskDto.expectedCTR as any ?? 0;
-task.channel            = taskDto.channel            ?? '';
-task.scheduledEndDate   = taskDto.scheduledEndDate   ?? new Date();
-task.sprint = sprint;
+    const task = new TaskMarketingEntity();
+    task.title = taskDto.title;
+    task.description = taskDto.description ?? '';
+    task.type = taskDto.type as any ?? '';
+    task.status = (taskDto.status || 'TO_DO') as any;
+    task.priority = taskDto.priority as any ?? '';
+    task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
+    task.budget = taskDto.budget ?? 0;
+    task.expectedViews = taskDto.expectedViews ?? 0;
+    task.expectedClicks = taskDto.expectedClicks ?? 0;
+    task.expectedLeads = taskDto.expectedLeads ?? 0;
+    task.expectedConversions = taskDto.expectedConversions ?? 0;
+    task.expectedCTR = taskDto.expectedCTR as any ?? 0;
+    task.channel = taskDto.channel ?? '';
+    task.scheduledEndDate = taskDto.scheduledEndDate ?? new Date();
+    task.sprint = sprint;
+    if (taskDto.assignedToId) {
+      task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    }
 
-  if (taskDto.assignedToId) {
-    task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    return this.taskMarketingRepo.save(task);
   }
 
-  return this.taskMarketingRepo.save(task);
-}
   async getMarketingSprintById(sprintId: number): Promise<SprintMarketingEntity> {
     const sprint = await this.sprintMarketingRepo.findOne({
       where: { id: sprintId },
@@ -934,166 +840,143 @@ task.sprint = sprint;
     return task;
   }
 
- async updateMarketingTaskStatus(
-  taskId: number,
-  status: string,
-  user: UserEntity,
-): Promise<TaskMarketingEntity> {
-  const task = await this.getMarketingTaskById(taskId);
-  const previousStatus = task.status;
-
-  task.status = status as any;
-
-  // ✅ Enregistrer l'historique AVEC LE DOMAINE
-  await this.taskHistoryService.recordTaskStatusChange(
-    task.id,
-    status,
-    'Marketing', // ← Spécifier le domaine
-  );
-
-  return this.taskMarketingRepo.save(task);
-}
-
-async updateMarketingTask(
-  taskId: number,
-  dto: UpdateTaskMarketingDto,
-  user: UserEntity,
-): Promise<TaskMarketingEntity> {
-  const task = await this.getMarketingTaskById(taskId);
-  const { assignedTo, ...rest } = dto as any;
-  const previousStatus = task.status;
-
-  Object.assign(task, rest);
-
-  if (assignedTo?.id) {
-    const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
-    if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
-    task.assignedTo = member;
+  async updateMarketingTaskStatus(
+    taskId: number,
+    status: string,
+    user: UserEntity,
+  ): Promise<TaskMarketingEntity> {
+    const task = await this.getMarketingTaskById(taskId);
+    task.status = status as any;
+    await this.taskHistoryService.recordTaskStatusChange(task.id, status, 'Marketing');
+    return this.taskMarketingRepo.save(task);
   }
 
-  // ✅ Enregistrer l'historique si le statut change
-  if (dto.status && dto.status !== previousStatus) {
-    await this.taskHistoryService.recordTaskStatusChange(
-      task.id,
-      dto.status as string,
-      'Marketing',
-    );
-  }
+  async updateMarketingTask(
+    taskId: number,
+    dto: UpdateTaskMarketingDto,
+    user: UserEntity,
+  ): Promise<TaskMarketingEntity> {
+    const task = await this.getMarketingTaskById(taskId);
+    const { assignedTo, ...rest } = dto as any;
+    const previousStatus = task.status;
 
-  if (dto.status === 'DONE' && !task.completedAt) {
-    task.completedAt = new Date();
-    if (task.scheduledEndDate) {
-      const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
-      task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+    Object.assign(task, rest);
+
+    if (assignedTo?.id) {
+      const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+      if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
+      task.assignedTo = member;
     }
+
+    if (dto.status && dto.status !== previousStatus) {
+      await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'Marketing');
+    }
+
+    if (dto.status === 'DONE' && !task.completedAt) {
+      task.completedAt = new Date();
+      if (task.scheduledEndDate) {
+        const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
+        task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+      }
+    }
+
+    return this.taskMarketingRepo.save(task);
   }
 
-  return this.taskMarketingRepo.save(task);
-}
   async deleteMarketingTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
     const task = await this.getMarketingTaskById(taskId);
     await this.taskMarketingRepo.remove(task);
     return { message: `Marketing Task #${taskId} deleted successfully` };
   }
 
-  
-    // ════════════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════════════
   // 📞 CALLCENTER SPRINTS & TASKS
   // ════════════════════════════════════════════════════════════════════
 
-async createCallCenterSprints(
-  projectId: number,
-  sprintsDto: CreateSprintCallCenterDto[],
-): Promise<SprintCallCenterEntity[]> {
-  const project = await this.projectCallCenterRepo.findOne({
-    where: { id: projectId },
-  });
-  if (!project) throw new NotFoundException('CallCenter Project not found');
+  async createCallCenterSprints(
+    projectId: number,
+    sprintsDto: CreateSprintCallCenterDto[],
+  ): Promise<SprintCallCenterEntity[]> {
+    const project = await this.projectCallCenterRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('CallCenter Project not found');
 
-  const createdSprints: SprintCallCenterEntity[] = [];
+    const createdSprints: SprintCallCenterEntity[] = [];
 
-  for (const sprintDto of sprintsDto) {
-    // ✅ Créer directement
-    const sprint = new SprintCallCenterEntity();
-    sprint.name = sprintDto.name;
-    sprint.startDate = new Date(sprintDto.startDate);
-    sprint.endDate = new Date(sprintDto.endDate);
-    sprint.status = 'planned';
-    sprint.targetAgents = sprintDto.targetAgents;
-    sprint.expectedCallVolume = sprintDto.expectedCallVolume;
-    sprint.targetConversionRate = sprintDto.targetConversionRate;
-    sprint.budgetAllocated = sprintDto.budgetAllocated;
-    sprint.qualityScoreTarget = sprintDto.qualityScoreTarget;
-    sprint.trainingContent = sprintDto.trainingContent;
-    sprint.scriptTemplates = sprintDto.scriptTemplates;
-    sprint.goals = sprintDto.goals;
-    sprint.project = project;
+    for (const sprintDto of sprintsDto) {
+      const sprint = new SprintCallCenterEntity();
+      sprint.name = sprintDto.name;
+      sprint.startDate = new Date(sprintDto.startDate);
+      sprint.endDate = new Date(sprintDto.endDate);
+      sprint.status = 'planned';
+      sprint.targetAgents = sprintDto.targetAgents;
+      sprint.expectedCallVolume = sprintDto.expectedCallVolume;
+      sprint.targetConversionRate = sprintDto.targetConversionRate;
+      sprint.budgetAllocated = sprintDto.budgetAllocated;
+      sprint.qualityScoreTarget = sprintDto.qualityScoreTarget;
+      sprint.trainingContent = sprintDto.trainingContent;
+      sprint.scriptTemplates = sprintDto.scriptTemplates;
+      sprint.goals = sprintDto.goals;
+      sprint.project = project;
 
-    const savedSprint = await this.sprintCallCenterRepo.save(sprint);
+      const savedSprint = await this.sprintCallCenterRepo.save(sprint);
 
-    if (sprintDto.tasks && sprintDto.tasks.length > 0) {
-      for (const taskDto of sprintDto.tasks) {
-        // ✅ Créer directement
-        const task = new TaskCallCenterEntity();
-        task.title = taskDto.title;
-        task.description = taskDto.description;
-        task.type = taskDto.type as any;
-        task.status = (taskDto.status || 'TO_DO') as any;
-        task.priority = taskDto.priority as any;
-        task.estimatedHours = taskDto.estimatedHours;
-        task.targetAgentCount = taskDto.targetAgentCount;
-        task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
-        task.targetConversionRate = taskDto.targetConversionRate;
-        task.qualityScoreTarget = taskDto.qualityScoreTarget;
-        task.scriptContent = taskDto.scriptContent;
-        task.scheduledEndDate = taskDto.scheduledEndDate;
-        task.sprint = savedSprint;
-
-        if (taskDto.assignedToId) {
-          task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+      if (sprintDto.tasks && sprintDto.tasks.length > 0) {
+        for (const taskDto of sprintDto.tasks) {
+          const task = new TaskCallCenterEntity();
+          task.title = taskDto.title;
+          task.description = taskDto.description;
+          task.type = taskDto.type as any;
+          task.status = (taskDto.status || 'TO_DO') as any;
+          task.priority = taskDto.priority as any;
+          task.estimatedHours = taskDto.estimatedHours;
+          task.targetAgentCount = taskDto.targetAgentCount;
+          task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
+          task.targetConversionRate = taskDto.targetConversionRate;
+          task.qualityScoreTarget = taskDto.qualityScoreTarget;
+          task.scriptContent = taskDto.scriptContent;
+          task.scheduledEndDate = taskDto.scheduledEndDate;
+          task.sprint = savedSprint;
+          if (taskDto.assignedToId) {
+            task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+          }
+          await this.taskCallCenterRepo.save(task);
         }
-
-        await this.taskCallCenterRepo.save(task);
       }
+
+      createdSprints.push(savedSprint);
     }
 
-    createdSprints.push(savedSprint);
+    return createdSprints;
   }
 
-  return createdSprints;
-}
+  async addTaskToCallCenterSprint(
+    sprintId: number,
+    taskDto: CreateTaskCallCenterDto,
+  ): Promise<TaskCallCenterEntity> {
+    const sprint = await this.sprintCallCenterRepo.findOne({ where: { id: sprintId } });
+    if (!sprint) throw new NotFoundException('CallCenter Sprint not found');
 
- async addTaskToCallCenterSprint(
-  sprintId: number,
-  taskDto: CreateTaskCallCenterDto,
-): Promise<TaskCallCenterEntity> {
-  const sprint = await this.sprintCallCenterRepo.findOne({
-    where: { id: sprintId },
-  });
-  if (!sprint) throw new NotFoundException('CallCenter Sprint not found');
+    const task = new TaskCallCenterEntity();
+    task.title = taskDto.title;
+    task.description = taskDto.description;
+    task.type = taskDto.type as any;
+    task.status = (taskDto.status || 'TO_DO') as any;
+    task.priority = taskDto.priority as any;
+    task.estimatedHours = taskDto.estimatedHours;
+    task.targetAgentCount = taskDto.targetAgentCount;
+    task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
+    task.targetConversionRate = taskDto.targetConversionRate;
+    task.qualityScoreTarget = taskDto.qualityScoreTarget;
+    task.scriptContent = taskDto.scriptContent;
+    task.scheduledEndDate = taskDto.scheduledEndDate;
+    task.sprint = sprint;
+    if (taskDto.assignedToId) {
+      task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    }
 
-  // ✅ Créer directement
-  const task = new TaskCallCenterEntity();
-  task.title = taskDto.title;
-  task.description = taskDto.description;
-  task.type = taskDto.type as any;
-  task.status = (taskDto.status || 'TO_DO') as any;
-  task.priority = taskDto.priority as any;
-  task.estimatedHours = taskDto.estimatedHours;
-  task.targetAgentCount = taskDto.targetAgentCount;
-  task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
-  task.targetConversionRate = taskDto.targetConversionRate;
-  task.qualityScoreTarget = taskDto.qualityScoreTarget;
-  task.scriptContent = taskDto.scriptContent;
-  task.scheduledEndDate = taskDto.scheduledEndDate;
-  task.sprint = sprint;
-
-  if (taskDto.assignedToId) {
-    task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    return this.taskCallCenterRepo.save(task);
   }
 
-  return this.taskCallCenterRepo.save(task);
-}
   async getCallCenterSprintById(sprintId: number): Promise<SprintCallCenterEntity> {
     const sprint = await this.sprintCallCenterRepo.findOne({
       where: { id: sprintId },
@@ -1128,67 +1011,52 @@ async createCallCenterSprints(
     return task;
   }
 
- async updateCallCenterTaskStatus(
-  taskId: number,
-  status: string,
-  user: UserEntity,
-): Promise<TaskCallCenterEntity> {
-  const task = await this.getCallCenterTaskById(taskId);
-  const previousStatus = task.status;
-
-  task.status = status as any;
-
-  // ✅ Enregistrer l'historique AVEC LE DOMAINE
-  await this.taskHistoryService.recordTaskStatusChange(
-    task.id,
-    status,
-    'CallCenter', // ← Spécifier le domaine
-  );
-
-  return this.taskCallCenterRepo.save(task);
-}
-
-async updateCallCenterTask(
-  taskId: number,
-  dto: UpdateTaskCallCenterDto,
-  user: UserEntity,
-): Promise<TaskCallCenterEntity> {
-  const task = await this.getCallCenterTaskById(taskId);
-  const { assignedTo, ...rest } = dto as any;
-  const previousStatus = task.status;
-
-  Object.assign(task, rest);
-
-  if (assignedTo?.id) {
-    const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
-    if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
-    task.assignedTo = member;
+  async updateCallCenterTaskStatus(
+    taskId: number,
+    status: string,
+    user: UserEntity,
+  ): Promise<TaskCallCenterEntity> {
+    const task = await this.getCallCenterTaskById(taskId);
+    task.status = status as any;
+    await this.taskHistoryService.recordTaskStatusChange(task.id, status, 'CallCenter');
+    return this.taskCallCenterRepo.save(task);
   }
 
-  // ✅ Enregistrer l'historique si le statut change
-  if (dto.status && dto.status !== previousStatus) {
-    await this.taskHistoryService.recordTaskStatusChange(
-      task.id,
-      dto.status as string,
-      'CallCenter',
-    );
-  }
+  async updateCallCenterTask(
+    taskId: number,
+    dto: UpdateTaskCallCenterDto,
+    user: UserEntity,
+  ): Promise<TaskCallCenterEntity> {
+    const task = await this.getCallCenterTaskById(taskId);
+    const { assignedTo, ...rest } = dto as any;
+    const previousStatus = task.status;
 
-  if (dto.status === 'DONE' && !task.completedAt) {
-    task.completedAt = new Date();
-    if (task.scheduledEndDate) {
-      const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
-      task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+    Object.assign(task, rest);
+
+    if (assignedTo?.id) {
+      const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+      if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
+      task.assignedTo = member;
     }
+
+    if (dto.status && dto.status !== previousStatus) {
+      await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'CallCenter');
+    }
+
+    if (dto.status === 'DONE' && !task.completedAt) {
+      task.completedAt = new Date();
+      if (task.scheduledEndDate) {
+        const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
+        task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+      }
+    }
+
+    return this.taskCallCenterRepo.save(task);
   }
 
-  return this.taskCallCenterRepo.save(task);
-}
   async deleteCallCenterTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
     const task = await this.getCallCenterTaskById(taskId);
     await this.taskCallCenterRepo.remove(task);
     return { message: `CallCenter Task #${taskId} deleted successfully` };
   }
-
- 
 }
