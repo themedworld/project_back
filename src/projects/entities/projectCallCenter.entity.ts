@@ -1,3 +1,15 @@
+import { 
+  Entity, 
+  Column, 
+  PrimaryGeneratedColumn, 
+  CreateDateColumn, 
+  UpdateDateColumn,
+  OneToOne,
+  JoinColumn,
+  OneToMany
+} from 'typeorm';
+import { ProjectEntity } from './project.entity';
+import { SprintCallCenterEntity } from './SprintCallCenterEntity.entity';
 @Entity('project_callcenter')
 export class ProjectCallCenterEntity {
   @PrimaryGeneratedColumn()
