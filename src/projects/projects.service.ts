@@ -428,10 +428,22 @@ async getCallCenterSprintsOfProject(projectId: number): Promise<SprintCallCenter
   }
 
   // 🔹 Créer les détails CallCenter
-  async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterDto) {
-    const callCenterDetails = this.projectCallCenterRepo.create({ ...dto, project });
-    return this.projectCallCenterRepo.save(callCenterDetails);
+async addCallCenterDetails(project: ProjectEntity, dto: CreateProjectCallCenterDto) {
+  // Chercher si un enregistrement existe déjà pour ce projet
+  const existing = await this.projectCallCenterRepo.findOne({
+    where: { project: { id: project.id } },
+  });
+
+  if (existing) {
+    // UPDATE — fusionner les champs non-null du dto
+    Object.assign(existing, dto);
+    return this.projectCallCenterRepo.save(existing);
   }
+
+  // INSERT — première fois
+  const callCenterDetails = this.projectCallCenterRepo.create({ ...dto, project });
+  return this.projectCallCenterRepo.save(callCenterDetails);
+}
 
   // 🔹 Initialiser automatiquement selon le domaine
   async initializeDomainDetails(project: ProjectEntity, dto: any) {
@@ -988,68 +1000,6 @@ async updateMarketingTask(
     // ════════════════════════════════════════════════════════════════════
   // 📞 CALLCENTER SPRINTS & TASKS
   // ════════════════════════════════════════════════════════════════════
-
-async createCallCenterSprints(
-  projectId: number,
-  sprintsDto: CreateSprintCallCenterDto[],
-): Promise<SprintCallCenterEntity[]> {
-  const project = await this.projectCallCenterRepo.findOne({
-    where: { id: projectId },
-  });
-  if (!project) throw new NotFoundException('CallCenter Project not found');
-
-  const createdSprints: SprintCallCenterEntity[] = [];
-
-  for (const sprintDto of sprintsDto) {
-    // ✅ Créer directement
-    const sprint = new SprintCallCenterEntity();
-    sprint.name = sprintDto.name;
-    sprint.startDate = new Date(sprintDto.startDate);
-    sprint.endDate = new Date(sprintDto.endDate);
-    sprint.status = 'planned';
-    sprint.targetAgents = sprintDto.targetAgents;
-    sprint.expectedCallVolume = sprintDto.expectedCallVolume;
-    sprint.targetConversionRate = sprintDto.targetConversionRate;
-    sprint.budgetAllocated = sprintDto.budgetAllocated;
-    sprint.qualityScoreTarget = sprintDto.qualityScoreTarget;
-    sprint.trainingContent = sprintDto.trainingContent;
-    sprint.scriptTemplates = sprintDto.scriptTemplates;
-    sprint.goals = sprintDto.goals;
-    sprint.project = project;
-
-    const savedSprint = await this.sprintCallCenterRepo.save(sprint);
-
-    if (sprintDto.tasks && sprintDto.tasks.length > 0) {
-      for (const taskDto of sprintDto.tasks) {
-        // ✅ Créer directement
-        const task = new TaskCallCenterEntity();
-        task.title = taskDto.title;
-        task.description = taskDto.description;
-        task.type = taskDto.type as any;
-        task.status = (taskDto.status || 'TO_DO') as any;
-        task.priority = taskDto.priority as any;
-        task.estimatedHours = taskDto.estimatedHours;
-        task.targetAgentCount = taskDto.targetAgentCount;
-        task.expectedCallsPerAgent = taskDto.expectedCallsPerAgent;
-        task.targetConversionRate = taskDto.targetConversionRate;
-        task.qualityScoreTarget = taskDto.qualityScoreTarget;
-        task.scriptContent = taskDto.scriptContent;
-        task.scheduledEndDate = taskDto.scheduledEndDate;
-        task.sprint = savedSprint;
-
-        if (taskDto.assignedToId) {
-          task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
-        }
-
-        await this.taskCallCenterRepo.save(task);
-      }
-    }
-
-    createdSprints.push(savedSprint);
-  }
-
-  return createdSprints;
-}
 
  async addTaskToCallCenterSprint(
   sprintId: number,
