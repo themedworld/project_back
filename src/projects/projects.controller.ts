@@ -133,14 +133,14 @@ export class ProjectsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
-  @Patch(':projectId/callcenter-details')   // ← PATCH
-  async addCallCenterDetails(
-    @Param('projectId', ParseIntPipe) projectId: number,
-    @Body() dto: CreateProjectCallCenterDto,
-  ) {
-    return this.projectsService.upsertCallCenterDetails(projectId, dto);
-  }
-
+  @Patch(':projectId/callcenter-details')
+async addCallCenterDetails(
+  @Param('projectId', ParseIntPipe) projectId: number,
+  @Body() dto: CreateProjectCallCenterDto,
+) {
+  console.log('📦 DTO reçu:', JSON.stringify(dto)); // ← ajoute ça
+  return this.projectsService.upsertCallCenterDetails(projectId, dto);
+}
   // 🔹 Initialiser automatiquement les détails selon le domaine
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.MANAGER, UserRole.PROJECT_MANAGER)
