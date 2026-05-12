@@ -62,7 +62,11 @@ export class ProjectCallCenterEntity {
 
   @Column({ type: 'int', nullable: true })
   teamSize: number;
+  @Column({ type: 'int', nullable: true })
+  estimatedBudget: number;
 
+  @Column({ nullable: true })
+  priority: string;
   @OneToMany(() => SprintCallCenterEntity, sprint => sprint.project)
   sprints: SprintCallCenterEntity[];
 
