@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { ProjectEntity } from 'src/projects/entities/project.entity';
 import { CompanyEntity } from 'src/companies/entities/company.entity';
+import {TaskITEntity} from 'src/projects/entities/project.TaskITEntity.entity'; 
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
@@ -91,6 +92,10 @@ export class UserEntity {
   // 🔹 Les projets où cet utilisateur est MEMBRE (ManyToMany inverse)
   @ManyToMany(() => ProjectEntity, project => project.assignedTo)
   assignedProjects: ProjectEntity[];
+  // user entity (extrait)
+  @OneToMany(() => TaskITEntity, task => task.assignedTo)
+  assignedTasks?: TaskITEntity[];
+
 
   @Column({ default: true })
   isActive: boolean;
