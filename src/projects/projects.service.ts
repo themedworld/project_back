@@ -443,7 +443,7 @@ export class ProjectsService {
   async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     const projectIT = await this.projectITRepo.findOne({
       where: { id: projectId },
-      relations: ['sprints', 'sprints.tasks'],
+      relations: ['sprints', 'sprints.tasks','sprints.tasks.assignedTo'],
     });
     if (!projectIT) throw new NotFoundException('Project IT not found');
     return projectIT.sprints;
@@ -452,7 +452,7 @@ export class ProjectsService {
   async getTasksOfSprint(sprintId: number): Promise<TaskITEntity[]> {
     const sprint = await this.sprintITRepo.findOne({
       where: { id: sprintId },
-      relations: ['tasks'],
+      relations: ['tasks','tasks.assignedTo'],
     });
     if (!sprint) throw new NotFoundException('Sprint not found');
     return sprint.tasks;
@@ -631,7 +631,7 @@ export class ProjectsService {
   async getTaskById(taskId: number): Promise<TaskITEntity> {
     const task = await this.taskITRepo.findOne({
       where: { id: taskId },
-      relations: ['assignedTo', 'sprint'],
+      relations: ['assignedTo', 'sprint' ,],
     });
     if (!task) throw new NotFoundException(`Tâche #${taskId} introuvable`);
     return task;
@@ -834,7 +834,7 @@ export class ProjectsService {
   async getMarketingTaskById(taskId: number): Promise<TaskMarketingEntity> {
     const task = await this.taskMarketingRepo.findOne({
       where: { id: taskId },
-      relations: ['assignedTo', 'sprint'],
+      relations: ['assignedTo', 'sprint','sprint.tasks', 'sprint.tasks.assignedTo'],
     });
     if (!task) throw new NotFoundException(`Marketing Task #${taskId} not found`);
     return task;
