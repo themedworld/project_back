@@ -722,130 +722,94 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
   // 📊 MARKETING SPRINTS & TASKS
   // ════════════════════════════════════════════════════════════════════
 
-  async function createMarketingSprints(
-  projectMarketingRepo: any,
-  sprintMarketingRepo: any,
-  taskMarketingRepo: any,
-  projectId: number, // ← c'est l'id du Project (table projects), pas de ProjectMarketing
-  sprintsDto: any[],
-) {
-  // ✅ Cherche par la relation FK project.id
-  const project = await projectMarketingRepo.findOne({
-    where: { project: { id: projectId } },
-  });
-  if (!project)
-    throw new Error(
-      `Marketing Project not found pour projectId=${projectId}. ` +
-      `Vérifiez que les détails marketing ont été initialisés (POST /projects/${projectId}/init-domain).`,
-    );
- 
-  const createdSprints: any[] = [];
- 
-  for (const sprintDto of sprintsDto) {
-    const sprint = sprintMarketingRepo.create({
-      name: sprintDto.name,
-      startDate: new Date(sprintDto.startDate ?? new Date()),
-      endDate: new Date(sprintDto.endDate ?? new Date()),
-      status: 'planned',
-      totalBudget: sprintDto.totalBudget,
-      campaignType: sprintDto.campaignType,
-      targetAudience: sprintDto.targetAudience,
-      expectedReach: sprintDto.expectedReach,
-      expectedLeads: sprintDto.expectedLeads,
-      expectedROI: sprintDto.expectedROI,
-      channels: sprintDto.channels,
-      goals: sprintDto.goals,
-      project,
-    });
- 
-    const savedSprint = await sprintMarketingRepo.save(sprint);
- 
-    if (sprintDto.tasks?.length > 0) {
-      for (const taskDto of sprintDto.tasks) {
-        const task: any = {};
-        task.title = taskDto.title;
-        task.description = taskDto.description ?? '';
-        task.type = taskDto.type ?? 'CAMPAIGN';
-        task.status = taskDto.status ?? 'TO_DO';
-        task.priority = taskDto.priority ?? 'MEDIUM';
-        task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
-        task.budget = taskDto.budget ?? 0;
-        task.expectedViews = taskDto.expectedViews ?? 0;
-        task.expectedClicks = taskDto.expectedClicks ?? 0;
-        task.expectedLeads = taskDto.expectedLeads ?? 0;
-        task.expectedConversions = taskDto.expectedConversions ?? 0;
-        task.expectedCTR = taskDto.expectedCTR ?? 0;
-        task.channel = taskDto.channel ?? '';
-        // ✅ Date de début
-        task.scheduledStartDate = taskDto.scheduledStartDate
-          ? new Date(taskDto.scheduledStartDate)
-          : null;
-        task.scheduledEndDate = taskDto.scheduledEndDate
-          ? new Date(taskDto.scheduledEndDate)
-          : null;
-        task.sprint = savedSprint;
-        if (taskDto.assignedToId) {
-          task.assignedTo = { id: taskDto.assignedToId };
-        }
-        await taskMarketingRepo.save(task);
-      }
-    }
- 
-    createdSprints.push(savedSprint);
-  }
- 
-  return createdSprints;
-}
+  async createMarketingSprints(
+    projectId: number,
+    sprintsDto: CreateSprintMarketingDto[],
+  ): Promise<SprintMarketingEntity[]> {
+    const project = await this.projectMarketingRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Marketing Project not found');
 
-  async function addTaskToMarketingSprint(
-  sprintMarketingRepo: any,
-  taskMarketingRepo: any,
-  sprintId: number,
-  taskDto: any,
-) {
-  const sprint = await sprintMarketingRepo.findOne({
-    where: { id: sprintId },
-    relations: ['project'],
-  });
-  if (!sprint) throw new Error('Marketing Sprint not found');
- 
-  const task: any = {};
-  task.title = taskDto.title;
-  task.description = taskDto.description ?? '';
-  task.type = taskDto.type ?? 'CAMPAIGN';
-  task.status = taskDto.status ?? 'TO_DO';
-  task.priority = taskDto.priority ?? 'MEDIUM';
-  task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
-  task.budget = taskDto.budget ?? 0;
-  task.expectedViews = taskDto.expectedViews ?? 0;
-  task.expectedClicks = taskDto.expectedClicks ?? 0;
-  task.expectedLeads = taskDto.expectedLeads ?? 0;
-  task.expectedConversions = taskDto.expectedConversions ?? 0;
-  task.expectedCTR = taskDto.expectedCTR ?? 0;
-  task.channel = taskDto.channel ?? '';
-  // ✅ Date de début
-  task.scheduledStartDate = taskDto.scheduledStartDate
-    ? new Date(taskDto.scheduledStartDate)
-    : null;
-  task.scheduledEndDate = taskDto.scheduledEndDate
-    ? new Date(taskDto.scheduledEndDate)
-    : null;
-  task.sprint = sprint;
-  if (taskDto.assignedTo?.id) {
-    task.assignedTo = { id: taskDto.assignedTo.id };
-  } else if (taskDto.assignedToId) {
-    task.assignedTo = { id: taskDto.assignedToId };
+    const createdSprints: SprintMarketingEntity[] = [];
+
+    for (const sprintDto of sprintsDto) {
+      const sprint = this.sprintMarketingRepo.create({
+        name: sprintDto.name,
+        startDate: new Date(sprintDto.startDate ?? new Date()),
+        endDate: new Date(sprintDto.endDate ?? new Date()),
+        status: 'planned',
+        totalBudget: sprintDto.totalBudget,
+        campaignType: sprintDto.campaignType,
+        targetAudience: sprintDto.targetAudience,
+        expectedReach: sprintDto.expectedReach,
+        expectedLeads: sprintDto.expectedLeads,
+        expectedROI: sprintDto.expectedROI,
+        channels: sprintDto.channels,
+        goals: sprintDto.goals,
+        project,
+      });
+
+      const savedSprint = await this.sprintMarketingRepo.save(sprint);
+
+      if (sprintDto.tasks && sprintDto.tasks.length > 0) {
+        for (const taskDto of sprintDto.tasks) {
+          const task = new TaskMarketingEntity();
+          task.title = taskDto.title;
+          task.description = taskDto.description ?? '';
+          task.type = taskDto.type as any ?? '';
+          task.status = (taskDto.status || 'TO_DO') as any;
+          task.priority = taskDto.priority as any ?? '';
+          task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
+          task.budget = taskDto.budget ?? 0;
+          task.expectedViews = taskDto.expectedViews ?? 0;
+          task.expectedClicks = taskDto.expectedClicks ?? 0;
+          task.expectedLeads = taskDto.expectedLeads ?? 0;
+          task.expectedConversions = taskDto.expectedConversions ?? 0;
+          task.expectedCTR = taskDto.expectedCTR as any ?? 0;
+          task.channel = taskDto.channel ?? '';
+          task.scheduledEndDate = taskDto.scheduledEndDate ?? new Date();
+          task.sprint = savedSprint;
+          if (taskDto.assignedToId) {
+            task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+          }
+          await this.taskMarketingRepo.save(task);
+        }
+      }
+
+      createdSprints.push(savedSprint);
+    }
+
+    return createdSprints;
   }
- 
-  const saved = await taskMarketingRepo.save(task);
- 
-  // ✅ Reload avec relations
-  return taskMarketingRepo.findOne({
-    where: { id: saved.id },
-    relations: ['assignedTo', 'sprint'],
-  });
-}
- 
+
+  async addTaskToMarketingSprint(
+    sprintId: number,
+    taskDto: CreateTaskMarketingDto,
+  ): Promise<TaskMarketingEntity> {
+    const sprint = await this.sprintMarketingRepo.findOne({ where: { id: sprintId } });
+    if (!sprint) throw new NotFoundException('Marketing Sprint not found');
+
+    const task = new TaskMarketingEntity();
+    task.title = taskDto.title;
+    task.description = taskDto.description ?? '';
+    task.type = taskDto.type as any ?? '';
+    task.status = (taskDto.status || 'TO_DO') as any;
+    task.priority = taskDto.priority as any ?? '';
+    task.estimatedHours = Math.round(taskDto.estimatedHours ?? 0);
+    task.budget = taskDto.budget ?? 0;
+    task.expectedViews = taskDto.expectedViews ?? 0;
+    task.expectedClicks = taskDto.expectedClicks ?? 0;
+    task.expectedLeads = taskDto.expectedLeads ?? 0;
+    task.expectedConversions = taskDto.expectedConversions ?? 0;
+    task.expectedCTR = taskDto.expectedCTR as any ?? 0;
+    task.channel = taskDto.channel ?? '';
+    task.scheduledEndDate = taskDto.scheduledEndDate ?? new Date();
+    task.sprint = sprint;
+    if (taskDto.assignedToId) {
+      task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    }
+
+    return this.taskMarketingRepo.save(task);
+  }
 
   async getMarketingSprintById(sprintId: number): Promise<SprintMarketingEntity> {
     const sprint = await this.sprintMarketingRepo.findOne({
@@ -872,18 +836,15 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     return { message: `Marketing Sprint #${sprintId} deleted successfully` };
   }
 
+  async getMarketingTaskById(taskId: number): Promise<TaskMarketingEntity> {
+    const task = await this.taskMarketingRepo.findOne({
+      where: { id: taskId },
+      relations: ['assignedTo', 'sprint','sprint.tasks', 'sprint.tasks.assignedTo'],
+    });
+    if (!task) throw new NotFoundException(`Marketing Task #${taskId} not found`);
+    return task;
+  }
 
-async function getMarketingTaskById(
-  taskMarketingRepo: any,
-  taskId: number,
-) {
-  const task = await taskMarketingRepo.findOne({
-    where: { id: taskId },
-    relations: ['assignedTo', 'sprint'], // ✅ plus de sprint.tasks ici
-  });
-  if (!task) throw new Error(`Marketing Task #${taskId} not found`);
-  return task;
-}
   async updateMarketingTaskStatus(
     taskId: number,
     status: string,
@@ -895,65 +856,37 @@ async function getMarketingTaskById(
     return this.taskMarketingRepo.save(task);
   }
 
-  async function updateMarketingTask(
-  taskMarketingRepo: any,
-  userRepo: any,
-  taskHistoryService: any,
-  taskId: number,
-  dto: any,
-  user: any,
-) {
-  // Utilise getMarketingTaskById_FIXED (relations minimales)
-  const task = await taskMarketingRepo.findOne({
-    where: { id: taskId },
-    relations: ['assignedTo', 'sprint'],
-  });
-  if (!task) throw new Error(`Marketing Task #${taskId} not found`);
- 
-  // Extraire assignedTo sous les deux formes possibles
-  const { assignedTo, assignedToId, ...rest } = dto;
-  const previousStatus = task.status;
- 
-  // Appliquer les champs scalaires
-  Object.assign(task, rest);
- 
-  // ✅ Résoudre l'id du membre depuis { id } OU assignedToId
-  const memberId = assignedTo?.id ?? assignedToId ?? null;
-  if (memberId != null) {
-    const member = await userRepo.findOne({ where: { id: memberId } });
-    if (!member) throw new Error(`Member #${memberId} not found`);
-    task.assignedTo = member;
-  }
- 
-  // Historique si changement de statut
-  if (dto.status && dto.status !== previousStatus) {
-    await taskHistoryService.recordTaskStatusChange(
-      task.id,
-      dto.status as string,
-      'Marketing',
-    );
-  }
- 
-  // Auto-complétion quand DONE
-  if (dto.status === 'DONE' && !task.completedAt) {
-    task.completedAt = new Date();
-    if (task.scheduledEndDate) {
-      const delayMs =
-        task.completedAt.getTime() -
-        new Date(task.scheduledEndDate).getTime();
-      task.delayHours =
-        Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+  async updateMarketingTask(
+    taskId: number,
+    dto: UpdateTaskMarketingDto,
+    user: UserEntity,
+  ): Promise<TaskMarketingEntity> {
+    const task = await this.getMarketingTaskById(taskId);
+    const { assignedTo, ...rest } = dto as any;
+    const previousStatus = task.status;
+
+    Object.assign(task, rest);
+
+    if (assignedTo?.id) {
+      const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+      if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
+      task.assignedTo = member;
     }
+
+    if (dto.status && dto.status !== previousStatus) {
+      await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'Marketing');
+    }
+
+    if (dto.status === 'DONE' && !task.completedAt) {
+      task.completedAt = new Date();
+      if (task.scheduledEndDate) {
+        const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
+        task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+      }
+    }
+
+    return this.taskMarketingRepo.save(task);
   }
- 
-  await taskMarketingRepo.save(task);
- 
-  // ✅ Reload pour retourner assignedTo correctement peuplé
-  return taskMarketingRepo.findOne({
-    where: { id: taskId },
-    relations: ['assignedTo', 'sprint'],
-  });
-}
 
   async deleteMarketingTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
     const task = await this.getMarketingTaskById(taskId);
