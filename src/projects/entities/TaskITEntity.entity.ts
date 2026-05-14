@@ -119,8 +119,6 @@ export class TaskITEntity {
   @Column({ type: 'timestamp', nullable: true })
   scheduledStartDate: Date;  // ← Date planifiée de début (saisie utilisateur)
 
-@Column({ type: 'timestamp', nullable: true })
-scheduledEndDate: Date;    // ← déjà existant
   @Column({ type: 'timestamp', nullable: true })
   scheduledEndDate: Date; // Date limite
 
