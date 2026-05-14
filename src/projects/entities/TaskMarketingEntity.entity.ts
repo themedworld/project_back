@@ -124,6 +124,8 @@ export class TaskMarketingEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   scheduledEndDate: Date;
+    @Column({ type: 'timestamp', nullable: true })
+  scheduledStartDate: Date;
 
   @Column({ type: 'decimal', nullable: true, precision: 10, scale: 2 })
   delayHours: number; // Retard automatique
