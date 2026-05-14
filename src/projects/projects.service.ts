@@ -440,14 +440,14 @@ export class ProjectsService {
     return { message: 'Project removed successfully' };
   }
 
-  async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
-    const projectIT = await this.projectITRepo.findOne({
-      where: { id: projectId },
-      relations: ['sprints', 'sprints.tasks','sprints.tasks.assignedTo'],
-    });
-    if (!projectIT) throw new NotFoundException('Project IT not found');
-    return projectIT.sprints;
-  }
+async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
+  const projectIT = await this.projectITRepo.findOne({
+    where: { project: { id: projectId } },  // ← ici
+    relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
+  });
+  if (!projectIT) throw new NotFoundException('Project IT not found');
+  return projectIT.sprints;
+}
 
   async getTasksOfSprint(sprintId: number): Promise<TaskITEntity[]> {
     const sprint = await this.sprintITRepo.findOne({
