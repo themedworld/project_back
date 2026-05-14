@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { ProjectEntity } from 'src/projects/entities/project.entity';
 import { CompanyEntity } from 'src/companies/entities/company.entity';
-import {TaskITEntity} from 'src/projects/entities/project.TaskITEntity.entity'; 
+import {TaskITEntity} from 'src/projects/entities/TaskITEntity.entity'; 
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
