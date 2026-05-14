@@ -1,50 +1,89 @@
-import { IsString, IsOptional, IsNumber, IsDate } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-
+ 
+class AssignedToDto {
+  @IsNumber()
+  id: number;
+}
+ 
 export class UpdateTaskMarketingDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   title?: string;
-
-  @IsOptional() @IsString()
+ 
+  @IsOptional()
+  @IsString()
   description?: string;
-
-  @IsOptional() @IsString()
+ 
+  @IsOptional()
+  @IsString()
   status?: string;
-
-  @IsOptional() @IsString()          // ✅ FIX #5 : string pas number
+ 
+  @IsOptional()
+  @IsString()
   priority?: string;
-
-  @IsOptional() @IsNumber()
+ 
+  @IsOptional()
+  @IsString()
+  type?: string;
+ 
+  @IsOptional()
+  @IsNumber()
   estimatedHours?: number;
-
-  @IsOptional() @IsNumber()
+ 
+  @IsOptional()
+  @IsNumber()
   budget?: number;
-
-  @IsOptional() @IsNumber()
+ 
+  @IsOptional()
+  @IsNumber()
   expectedViews?: number;
-
-  @IsOptional() @IsNumber()
-  expectedClicks?: number;           // ✅ FIX : champ manquant ajouté
-
-  @IsOptional() @IsNumber()
+ 
+  @IsOptional()
+  @IsNumber()
+  expectedClicks?: number;
+ 
+  @IsOptional()
+  @IsNumber()
   expectedLeads?: number;
-
-  @IsOptional() @IsNumber()
+ 
+  @IsOptional()
+  @IsNumber()
   expectedConversions?: number;
-
-  @IsOptional() @IsNumber()
-  expectedCTR?: number;              // ✅ FIX #3 : number cohérent
-
-  @IsOptional() @IsString()
+ 
+  @IsOptional()
+  @IsNumber()
+  expectedCTR?: number;
+ 
+  @IsOptional()
+  @IsString()
   channel?: string;
-
-  @IsOptional() @IsNumber()
-  assignedToId?: number;             // ✅ FIX #4 : plat, pas { id: number }
-
-  @IsOptional() @IsString()
-  type?: string;                     // ✅ FIX : champ manquant ajouté
-
+ 
+  // ✅ Format { id } depuis le front (cohérent avec le service)
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => AssignedToDto)
+  assignedTo?: AssignedToDto;
+ 
+  // ✅ Compatibilité ancienne API (format plat)
+  @IsOptional()
+  @IsNumber()
+  assignedToId?: number;
+ 
+  // ✅ Date de début ajoutée
   @IsOptional()
   @Type(() => Date)
-  scheduledEndDate?: Date;
+  scheduledStartDate?: Date | null;
+ 
+  @IsOptional()
+  @Type(() => Date)
+  scheduledEndDate?: Date | null;
 }
+ 

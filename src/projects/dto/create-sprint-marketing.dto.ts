@@ -1,6 +1,7 @@
 import { IsString, IsDate, IsOptional, IsNumber, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-
+import { IsOptional as IsOpt } from 'class-validator';
+import { Type as T2 } from 'class-transformer';
 export class CreateTaskMarketingDto {
   @IsString()
   title: string;
@@ -47,6 +48,10 @@ export class CreateTaskMarketingDto {
   @IsOptional()
   @Type(() => Date)
   scheduledEndDate?: Date;
+  @IsOpt()
+  @T2(() => Date)
+  scheduledStartDate?: Date | null;
+
 
   // ✅ Champs AI — whitelist les accepte maintenant
   @IsOptional() @IsNumber()
@@ -103,4 +108,5 @@ export class CreateSprintMarketingDto {
   @ValidateNested({ each: true })  // ← CLEF : valide chaque tâche
   @Type(() => CreateTaskMarketingDto)
   tasks?: CreateTaskMarketingDto[];
+
 }
