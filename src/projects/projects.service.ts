@@ -442,11 +442,16 @@ export class ProjectsService {
 
 async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
   const projectIT = await this.projectITRepo.findOne({
-    where: { project: { id: projectId } },  // ← ici
+    where: { project: { id: projectId } },
     relations: ['sprints', 'sprints.tasks', 'sprints.tasks.assignedTo'],
   });
+  
+  console.log('projectIT trouvé:', projectIT?.id);
+  console.log('sprints count:', projectIT?.sprints?.length);
+  console.log('tasks[0] assignedTo:', projectIT?.sprints?.[0]?.tasks?.[0]?.assignedTo);
+  
   if (!projectIT) throw new NotFoundException('Project IT not found');
-  return projectIT.sprints;
+  return projectIT.sprints ?? [];
 }
 
   async getTasksOfSprint(sprintId: number): Promise<TaskITEntity[]> {
