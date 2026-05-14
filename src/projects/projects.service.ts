@@ -440,7 +440,7 @@ export class ProjectsService {
     return { message: 'Project removed successfully' };
   }
 
-  async (projectId: number): Promise<SprintITEntity[]> {
+  async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     const projectIT = await this.projectITRepo.findOne({
       where: { id: projectId },
       relations: ['sprints', 'sprints.tasks','sprints.tasks.assignedTo'],
