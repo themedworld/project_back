@@ -117,6 +117,11 @@ export class TaskITEntity {
   @Column({ type: 'decimal', nullable: true, precision: 10, scale: 2 })
   workLogHours: number;
   @Column({ type: 'timestamp', nullable: true })
+  scheduledStartDate: Date;  // ← Date planifiée de début (saisie utilisateur)
+
+@Column({ type: 'timestamp', nullable: true })
+scheduledEndDate: Date;    // ← déjà existant
+  @Column({ type: 'timestamp', nullable: true })
   scheduledEndDate: Date; // Date limite
 
   @Column({ type: 'timestamp', nullable: true })

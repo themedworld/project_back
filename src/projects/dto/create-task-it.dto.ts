@@ -16,6 +16,7 @@ export class CreateTaskITDto {
   @IsOptional()
   description?: string;
 
+
   @IsEnum(TaskType)
   @IsOptional()
   type?: TaskType;
@@ -66,6 +67,9 @@ export class CreateTaskITDto {
   @IsNumber()
   @IsOptional()
   delayHours?: number;
+  
+  @IsOptional()
+  scheduledStartDate?: Date | string | null;
 
   @IsOptional()
   scheduledEndDate?: Date | string | null;
