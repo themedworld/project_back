@@ -41,6 +41,14 @@ export class UpdateTaskCallCenterDto {
   assignedTo?: { id: number };
 
   @IsOptional()
+  @IsString()
+  type?: string;              // ← was missing entirely
+
+  @IsOptional()
+  @IsDate()
+  scheduledStartDate?: Date;  // ← add this
+
+  @IsOptional()
   @IsDate()
   scheduledEndDate?: Date;
 

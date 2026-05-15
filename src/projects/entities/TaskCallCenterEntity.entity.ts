@@ -11,14 +11,25 @@ import { UserEntity } from 'src/user/entities/user.entity';
 import { SprintCallCenterEntity } from './SprintCallCenterEntity.entity';
 
 export enum TaskCallCenterType {
-  TRAINING = 'TRAINING',
-  CAMPAIGN = 'CAMPAIGN',
+  // ── Nouveaux types frontend ──
+  OUTBOUND    = 'OUTBOUND',
+  INBOUND     = 'INBOUND',
+  FOLLOW_UP   = 'FOLLOW_UP',
+  SURVEY      = 'SURVEY',
+  APPOINTMENT = 'APPOINTMENT',
+  RETENTION   = 'RETENTION',
+  UPSELL      = 'UPSELL',
+  SUPPORT     = 'SUPPORT',
+  QA          = 'QA',
+  OTHER       = 'OTHER',
+  // ── Anciens types du modèle ML (gardés pour compatibilité DB) ──
+  TRAINING          = 'TRAINING',
+  CAMPAIGN          = 'CAMPAIGN',
   QUALITY_ASSURANCE = 'QUALITY_ASSURANCE',
-  SCRIPTING = 'SCRIPTING',
-  COACHING = 'COACHING',
-  REPORTING = 'REPORTING',
-  SYSTEM_SETUP = 'SYSTEM_SETUP',
-  OTHER = 'OTHER',
+  SCRIPTING         = 'SCRIPTING',
+  COACHING          = 'COACHING',
+  REPORTING         = 'REPORTING',
+  SYSTEM_SETUP      = 'SYSTEM_SETUP',
 }
 
 export enum TaskCallCenterStatus {
@@ -110,6 +121,9 @@ export class TaskCallCenterEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  scheduledStartDate: Date;   // ← add this after scheduledEndDate
 
   @Column({ type: 'timestamp', nullable: true })
   scheduledEndDate: Date;

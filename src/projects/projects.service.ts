@@ -939,6 +939,7 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
           task.targetConversionRate = taskDto.targetConversionRate;
           task.qualityScoreTarget = taskDto.qualityScoreTarget;
           task.scriptContent = taskDto.scriptContent;
+          task.scheduledStartDate = taskDto.scheduledStartDate;
           task.scheduledEndDate = taskDto.scheduledEndDate;
           task.sprint = savedSprint;
           if (taskDto.assignedToId) {
@@ -973,7 +974,9 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     task.targetConversionRate = taskDto.targetConversionRate;
     task.qualityScoreTarget = taskDto.qualityScoreTarget;
     task.scriptContent = taskDto.scriptContent;
+    task.scheduledStartDate = taskDto.scheduledStartDate;
     task.scheduledEndDate = taskDto.scheduledEndDate;
+  
     task.sprint = sprint;
     if (taskDto.assignedToId) {
       task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
