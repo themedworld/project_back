@@ -9,18 +9,12 @@ import {
 import { UserEntity } from 'src/user/entities/user.entity';
 import { SprintITEntity } from './SprintITEntity.entity';
  
-export enum TaskCallCenterType {
-  OUTBOUND = 'OUTBOUND',
-  INBOUND = 'INBOUND',
-  FOLLOW_UP = 'FOLLOW_UP',
-  SURVEY = 'SURVEY',
-  APPOINTMENT = 'APPOINTMENT',
-  RETENTION = 'RETENTION',
-  UPSELL = 'UPSELL',
-  SUPPORT = 'SUPPORT',
-  TRAINING = 'TRAINING',
-  QA = 'QA',
-  OTHER = 'OTHER',
+export enum TaskType {
+  FEATURE = 'FEATURE',
+  BUG = 'BUG',
+  IMPROVEMENT = 'IMPROVEMENT',
+  TASK = 'TASK',
+  STORY = 'STORY',
 }
  
 export enum TaskStatus {

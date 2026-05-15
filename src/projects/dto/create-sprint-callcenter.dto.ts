@@ -95,6 +95,10 @@ export class CreateTaskCallCenterDto {
   assignedToId: number;
 
   @IsOptional()
+@IsDate()
+scheduledStartDate: Date;   // ← add alongside scheduledEndDate
+
+  @IsOptional()
   @IsDate()
   scheduledEndDate: Date;
 }
