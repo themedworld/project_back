@@ -4,8 +4,8 @@ export class CreateSprintCallCenterDto {
   @IsString()
   name: string;
 
-  @IsDateString() startDate: string;  // ← était @IsDate()
-  @IsDateString() endDate: string;    // ← était @IsDate()
+  @IsDateString() startDate: string; 
+  @IsDateString() endDate: string;    
 
   @IsOptional()
   @IsNumber()

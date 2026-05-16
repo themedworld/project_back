@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsDate } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDate,IsDateString } from 'class-validator';
 
 export class UpdateTaskCallCenterDto {
   @IsOptional()
@@ -43,15 +43,8 @@ export class UpdateTaskCallCenterDto {
   @IsOptional()
   @IsString()
   type?: string;              // ← was missing entirely
-
-  @IsOptional()
-  @IsDate()
-  scheduledStartDate?: Date;  // ← add this
-
-  @IsOptional()
-  @IsDate()
-  scheduledEndDate?: Date;
-
+  @IsOptional() @IsDateString() scheduledStartDate?: string;  // ← était @IsDate()
+  @IsOptional() @IsDateString() scheduledEndDate?: string;
   @IsOptional()
   @IsString()
   notes?: string;

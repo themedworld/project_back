@@ -6,7 +6,6 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
-  IsDateString,
 } from 'typeorm';
 import { UserEntity } from 'src/user/entities/user.entity';
 import { SprintCallCenterEntity } from './SprintCallCenterEntity.entity';
@@ -122,8 +121,12 @@ export class TaskCallCenterEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date;
-@IsOptional() @IsDateString() scheduledStartDate?: string;  // ← était @IsDate()
-  @IsOptional() @IsDateString() scheduledEndDate?: string;    // ← était @IsDate()
+
+  @Column({ type: 'timestamp', nullable: true })
+  scheduledStartDate: Date;   // ← add this after scheduledEndDate
+
+  @Column({ type: 'timestamp', nullable: true })
+  scheduledEndDate: Date;
 
   @Column({ type: 'decimal', nullable: true, precision: 10, scale: 2 })
   delayHours: number; // Retard automatique
