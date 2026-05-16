@@ -1,14 +1,11 @@
-import { IsString, IsDate, IsOptional, IsNumber, IsArray } from 'class-validator';
+import { IsString, IsDate, IsOptional, IsNumber, IsArray,IsDateString } from 'class-validator';
 
 export class CreateSprintCallCenterDto {
   @IsString()
   name: string;
 
-  @IsDate()
-  startDate: Date;
-
-  @IsDate()
-  endDate: Date;
+  @IsDateString() startDate: string;  // ← était @IsDate()
+  @IsDateString() endDate: string;    // ← était @IsDate()
 
   @IsOptional()
   @IsNumber()

@@ -993,16 +993,20 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     if (!sprint) throw new NotFoundException(`CallCenter Sprint #${sprintId} not found`);
     return sprint;
   }
+async updateCallCenterSprint(
+  sprintId: number,
+  dto: UpdateSprintCallCenterDto,
+  user: UserEntity,
+): Promise<SprintCallCenterEntity> {
+  const sprint = await this.getCallCenterSprintById(sprintId);
+  const { startDate, endDate, ...rest } = dto as any;
 
-  async updateCallCenterSprint(
-    sprintId: number,
-    dto: UpdateSprintCallCenterDto,
-    user: UserEntity,
-  ): Promise<SprintCallCenterEntity> {
-    const sprint = await this.getCallCenterSprintById(sprintId);
-    Object.assign(sprint, dto);
-    return this.sprintCallCenterRepo.save(sprint);
-  }
+  Object.assign(sprint, rest);
+  if (startDate) sprint.startDate = new Date(startDate);  // ← convertir
+  if (endDate)   sprint.endDate   = new Date(endDate);    // ← convertir
+
+  return this.sprintCallCenterRepo.save(sprint);
+}
 
   async deleteCallCenterSprint(sprintId: number, user: UserEntity): Promise<{ message: string }> {
     const sprint = await this.getCallCenterSprintById(sprintId);

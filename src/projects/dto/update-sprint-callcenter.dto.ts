@@ -1,17 +1,12 @@
-import { IsString, IsDate, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsDate, IsOptional, IsNumber,IsDateString } from 'class-validator';
 
 export class UpdateSprintCallCenterDto {
   @IsOptional()
   @IsString()
   name?: string;
 
-  @IsOptional()
-  @IsDate()
-  startDate?: Date;
-
-  @IsOptional()
-  @IsDate()
-  endDate?: Date;
+  @IsOptional() @IsDateString() startDate?: string;  // ← était @IsDate()
+  @IsOptional() @IsDateString() endDate?: string;    // ← était @IsDate()
 
   @IsOptional()
   @IsString()
