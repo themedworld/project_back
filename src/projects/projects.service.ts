@@ -939,8 +939,12 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
           task.targetConversionRate = taskDto.targetConversionRate;
           task.qualityScoreTarget = taskDto.qualityScoreTarget;
           task.scriptContent = taskDto.scriptContent;
-          task.scheduledStartDate = taskDto.scheduledStartDate;
-          task.scheduledEndDate = taskDto.scheduledEndDate;
+task.scheduledStartDate = taskDto.scheduledStartDate
+  ? new Date(taskDto.scheduledStartDate)
+  : undefined;
+task.scheduledEndDate = taskDto.scheduledEndDate
+  ? new Date(taskDto.scheduledEndDate)
+  : undefined;
           task.sprint = savedSprint;
           if (taskDto.assignedToId) {
             task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
@@ -974,8 +978,12 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     task.targetConversionRate = taskDto.targetConversionRate;
     task.qualityScoreTarget = taskDto.qualityScoreTarget;
     task.scriptContent = taskDto.scriptContent;
-    task.scheduledStartDate = taskDto.scheduledStartDate;
-    task.scheduledEndDate = taskDto.scheduledEndDate;
+task.scheduledStartDate = taskDto.scheduledStartDate
+  ? new Date(taskDto.scheduledStartDate)
+  : undefined;
+task.scheduledEndDate = taskDto.scheduledEndDate
+  ? new Date(taskDto.scheduledEndDate)
+  : undefined;
   
     task.sprint = sprint;
     if (taskDto.assignedToId) {
@@ -1035,36 +1043,40 @@ async updateCallCenterSprint(
   }
 
   async updateCallCenterTask(
-    taskId: number,
-    dto: UpdateTaskCallCenterDto,
-    user: UserEntity,
-  ): Promise<TaskCallCenterEntity> {
-    const task = await this.getCallCenterTaskById(taskId);
-    const { assignedTo, ...rest } = dto as any;
-    const previousStatus = task.status;
+  taskId: number,
+  dto: UpdateTaskCallCenterDto,
+  user: UserEntity,
+): Promise<TaskCallCenterEntity> {
+  const task = await this.getCallCenterTaskById(taskId);
+  const { assignedTo, scheduledStartDate, scheduledEndDate, ...rest } = dto as any;
+  const previousStatus = task.status;
 
-    Object.assign(task, rest);
+  Object.assign(task, rest);
 
-    if (assignedTo?.id) {
-      const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
-      if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
-      task.assignedTo = member;
-    }
+  // ← convertir les strings ISO en Date pour TypeORM
+  if (scheduledStartDate) task.scheduledStartDate = new Date(scheduledStartDate);
+  if (scheduledEndDate)   task.scheduledEndDate   = new Date(scheduledEndDate);
 
-    if (dto.status && dto.status !== previousStatus) {
-      await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'CallCenter');
-    }
-
-    if (dto.status === 'DONE' && !task.completedAt) {
-      task.completedAt = new Date();
-      if (task.scheduledEndDate) {
-        const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
-        task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
-      }
-    }
-
-    return this.taskCallCenterRepo.save(task);
+  if (assignedTo?.id) {
+    const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
+    if (!member) throw new NotFoundException(`Member #${assignedTo.id} not found`);
+    task.assignedTo = member;
   }
+
+  if (dto.status && dto.status !== previousStatus) {
+    await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'CallCenter');
+  }
+
+  if (dto.status === 'DONE' && !task.completedAt) {
+    task.completedAt = new Date();
+    if (task.scheduledEndDate) {
+      const delayMs = task.completedAt.getTime() - task.scheduledEndDate.getTime();
+      task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+    }
+  }
+
+  return this.taskCallCenterRepo.save(task);
+}
 
   async deleteCallCenterTask(taskId: number, user: UserEntity): Promise<{ message: string }> {
     const task = await this.getCallCenterTaskById(taskId);
