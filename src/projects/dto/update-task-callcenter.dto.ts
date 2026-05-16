@@ -15,7 +15,7 @@ export class UpdateTaskCallCenterDto {
 
   @IsOptional()
   @IsNumber()
-  priority?: number;
+  priority?: string;
 
   @IsOptional()
   @IsNumber()
