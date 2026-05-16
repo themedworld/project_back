@@ -941,10 +941,10 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
           task.scriptContent = taskDto.scriptContent;
 task.scheduledStartDate = taskDto.scheduledStartDate
   ? new Date(taskDto.scheduledStartDate)
-  : undefined;
+  : null as any;
 task.scheduledEndDate = taskDto.scheduledEndDate
   ? new Date(taskDto.scheduledEndDate)
-  : undefined;
+  : null as any;
           task.sprint = savedSprint;
           if (taskDto.assignedToId) {
             task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
@@ -980,10 +980,10 @@ task.scheduledEndDate = taskDto.scheduledEndDate
     task.scriptContent = taskDto.scriptContent;
 task.scheduledStartDate = taskDto.scheduledStartDate
   ? new Date(taskDto.scheduledStartDate)
-  : undefined;
+  : null as any;
 task.scheduledEndDate = taskDto.scheduledEndDate
   ? new Date(taskDto.scheduledEndDate)
-  : undefined;
+  : null as any;
   
     task.sprint = sprint;
     if (taskDto.assignedToId) {
