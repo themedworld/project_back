@@ -672,12 +672,17 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
       await this.taskHistoryService.recordTaskStatusChange(task.id, dto.status as string, 'IT');
     }
 
-    if (dto.status === 'DONE' && !task.actualEndDate) {
-      task.actualEndDate = new Date();
-      if (task.scheduledEndDate) {
-        const delayMs = task.actualEndDate.getTime() - task.scheduledEndDate.getTime();
-        task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
-      }
+// ✅ Après
+if (dto.status === 'DONE' && !task.actualEndDate) {
+  task.actualEndDate = new Date();
+  if (task.scheduledEndDate) {
+    const scheduledEnd = task.scheduledEndDate instanceof Date
+      ? task.scheduledEndDate
+      : new Date(task.scheduledEndDate);         // ← convertit string → Date
+    const delayMs = task.actualEndDate.getTime() - scheduledEnd.getTime();
+    task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
+  }
+}
     }
 
     return this.taskITRepo.save(task);
