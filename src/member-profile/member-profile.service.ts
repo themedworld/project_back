@@ -126,12 +126,11 @@ export class MemberProfileService {
       await this.checkPermissions(requesterUserId, userId);
     }
 
-    // Utiliser getProfile sans le recalcul pour la mise à jour
     const profile = await this.profileRepo.findOne({ where: { userId } });
     if (!profile) throw new NotFoundException(`Profil introuvable pour l'utilisateur ${userId}`);
 
-    Object.assign(profile, dto);
-    return this.profileRepo.save(profile);
+    const updated: MemberProfileEntity = Object.assign(profile, dto);
+    return this.profileRepo.save(updated);
   }
 
   async getAllProfiles(requesterUserId?: number): Promise<MemberProfileEntity[]> {
