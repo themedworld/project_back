@@ -685,7 +685,7 @@ if (dto.status === 'DONE' && !task.actualEndDate) {
     task.delayHours = Math.round((delayMs / (1000 * 60 * 60)) * 100) / 100;
   }
 }
-    }
+    
 
     return this.taskITRepo.save(task);
   }
