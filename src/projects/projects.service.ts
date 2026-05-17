@@ -661,8 +661,7 @@ async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
     const previousStatus = task.status;
 
     Object.assign(task, rest);
-  if (scheduledStartDate) task.scheduledStartDate = new Date(scheduledStartDate);
-  if (scheduledEndDate)   task.scheduledEndDate  = new Date(scheduledEndDate);
+
 
     if (assignedTo?.id) {
       const member = await this.userRepo.findOne({ where: { id: assignedTo.id } });
