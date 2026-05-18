@@ -29,7 +29,6 @@ interface RequestWithUser extends Request {
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Get()
   findAll(@Req() req: RequestWithUser) {
     return this.postsService.findAll(req.user);
