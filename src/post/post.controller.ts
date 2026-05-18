@@ -30,7 +30,6 @@ export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.HR_MANAGER)
   @Get()
   findAll(@Req() req: RequestWithUser) {
     return this.postsService.findAll(req.user);
