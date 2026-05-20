@@ -8,7 +8,8 @@ import {
   Delete, 
   ParseIntPipe,
   UseGuards,
-  Req
+  Req,
+  Query
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ProjectsService } from './projects.service';
@@ -522,4 +523,13 @@ async addCallCenterDetails(
   ) {
     return this.projectsService.updateCallCenterTaskStatus(taskId, status, req.user as UserEntity);
   }
+@UseGuards(JwtAuthGuard)
+@Get()
+async findAlluser(
+  @Req() req: RequestWithUser,
+  @Query('assignedMemberId') assignedMemberId?: string // Ajout du paramètre
+) {
+  const user = req.user as UserEntity;
+  return this.projectsService.findAlluser(user, assignedMemberId);
+}
 }

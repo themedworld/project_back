@@ -1089,4 +1089,37 @@ async updateCallCenterSprint(
     await this.taskCallCenterRepo.remove(task);
     return { message: `CallCenter Task #${taskId} deleted successfully` };
   }
+  async findAlluser(user: UserEntity, assignedMemberId?: string) {
+  const relations = ['createdBy', 'projectManager', 'assignedTo', 'company'];
+
+  // AJOUT : Si le frontend demande les projets d'un membre spécifique
+  if (assignedMemberId) {
+    const memberId = parseInt(assignedMemberId, 10);
+    return this.projectRepo.find({
+      where: { assignedTo: { id: memberId } },
+      relations,
+    });
+  }
+
+  // LOGIQUE EXISTANTE : Si aucun paramètre n'est passé, on garde le comportement par défaut
+  if (user.role === UserRole.SUPER_ADMIN) {
+    return this.projectRepo.find({ relations });
+  }
+  if (!user.companyId) return [];
+
+  if (user.role === UserRole.ADMIN_COMPANY) {
+    return this.projectRepo.find({
+      where: { company: { id: user.companyId as number } },
+      relations,
+    });
+  }
+  if (user.role === UserRole.MANAGER) {
+    return this.projectRepo.find({ where: { createdBy: { id: user.id } }, relations });
+  }
+  if (user.role === UserRole.PROJECT_MANAGER) {
+    return this.projectRepo.find({ where: { projectManager: { id: user.id } }, relations });
+  }
+  
+  return this.projectRepo.find({ where: { assignedTo: { id: user.id } }, relations });
+}
 }
