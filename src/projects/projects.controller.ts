@@ -523,10 +523,10 @@ async addCallCenterDetails(
     return this.projectsService.updateCallCenterTaskStatus(taskId, status, req.user as UserEntity);
   }
 @UseGuards(JwtAuthGuard)
-@Get()
+@Get('by-member')
 async findAlluser(
   @Req() req: RequestWithUser,
-  @Query('assignedMemberId') assignedMemberId?: string // Ajout du paramètre
+  @Query('assignedMemberId') assignedMemberId?: string,
 ) {
   const user = req.user as UserEntity;
   return this.projectsService.findAlluser(user, assignedMemberId);
