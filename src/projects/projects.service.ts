@@ -1107,7 +1107,7 @@ async updateCallCenterSprint(
   }
   if (!user.companyId) return [];
 
-  if (user.role === UserRole.ADMIN_COMPANY) {
+  if (user.role === UserRole.ADMIN_COMPANY || user.role === UserRole.HR_MANAGER) {
     return this.projectRepo.find({
       where: { company: { id: user.companyId as number } },
       relations,
