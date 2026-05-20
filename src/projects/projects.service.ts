@@ -1122,4 +1122,27 @@ async updateCallCenterSprint(
   
   return this.projectRepo.find({ where: { assignedTo: { id: user.id } }, relations });
 }
+async getMemberProjects(memberId: number) {
+  const projects = await this.projectRepo.find({
+    where: { assignedTo: { id: memberId } },
+    relations: [
+      'createdBy', 'projectManager', 'assignedTo', 'company',
+      'itDetails',
+      'marketingDetails',
+      'callCenterDetails',
+    ],
+  });
+
+  return projects.map(p => ({
+    id: p.id,
+    name: p.name,
+    domain: p.domain,
+    status: p.status,
+    domainDetails:
+      p.domain === 'IT'         ? p.itDetails         ?? null :
+      p.domain === 'Marketing'  ? p.marketingDetails  ?? null :
+      p.domain === 'CallCenter' ? p.callCenterDetails ?? null :
+      null,
+  }));
+}
 }

@@ -531,4 +531,11 @@ async findAlluser(
   const user = req.user as UserEntity;
   return this.projectsService.findAlluser(user, assignedMemberId);
 }
+@UseGuards(JwtAuthGuard)
+@Get('member/:memberId/projects')
+async getMemberProjects(
+  @Param('memberId', ParseIntPipe) memberId: number,
+) {
+  return this.projectsService.getMemberProjects(memberId);
+}
 }
