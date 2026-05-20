@@ -8,8 +8,7 @@ import {
   Delete, 
   ParseIntPipe,
   UseGuards,
-  Req,
-  Query
+  Req
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ProjectsService } from './projects.service';
